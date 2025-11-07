@@ -14,20 +14,30 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant } from '@/lib/types';
-import { addTenant, updateTenant } from '@/lib/firebase/firestore';
-import { PlusCircle, Edit } from 'lucide-react';
+import { addTenant, updateTenant, deleteTenant } from '@/lib/firebase/firestore';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -139,14 +149,26 @@ function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.R
 export default function TenantManagement() {
   const t = useTranslation();
   const context = useContext(AppContext);
+  const { toast } = useToast();
 
   if (!context) return null;
 
-  const { tenants, properties } = context;
+  const { tenants, properties, refreshTenants } = context;
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';
   }
+  
+  const handleDelete = async (tenantId: string) => {
+    try {
+      await deleteTenant(tenantId);
+      await refreshTenants();
+      toast({ title: 'Tenant Deleted' });
+    } catch (error) {
+      console.error("Failed to delete tenant:", error);
+      toast({ variant: 'destructive', title: 'Failed to delete tenant', description: (error as Error).message });
+    }
+  };
 
   return (
     <Card>
@@ -175,10 +197,27 @@ export default function TenantManagement() {
                 <TableCell className="font-medium">{tenant.name}</TableCell>
                 <TableCell>{getPropertyName(tenant.propertyId)}</TableCell>
                 <TableCell>{tenant.contact}</TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
                     <TenantDialog tenant={tenant}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
                     </TenantDialog>
+                     <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the tenant.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(tenant.tenantId)}>Continue</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                 </TableCell>
               </TableRow>
             ))}

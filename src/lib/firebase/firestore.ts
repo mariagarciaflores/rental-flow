@@ -1,7 +1,8 @@
-import { collection, getDocs, addDoc, doc, updateDoc, getFirestore, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./client";
 import type { Tenant, Property } from "@/lib/types";
 
+// Tenant Functions
 export async function getTenants(): Promise<Tenant[]> {
     const tenantsCol = collection(db, "tenants");
     const tenantSnapshot = await getDocs(tenantsCol);
@@ -20,6 +21,12 @@ export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>
     await updateDoc(tenantRef, tenantData);
 }
 
+export async function deleteTenant(tenantId: string): Promise<void> {
+    const tenantRef = doc(db, "tenants", tenantId);
+    await deleteDoc(tenantRef);
+}
+
+// Property Functions
 export async function getProperties(): Promise<Property[]> {
     const propertiesCol = collection(db, "properties");
     const propertySnapshot = await getDocs(propertiesCol);
