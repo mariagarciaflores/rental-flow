@@ -158,7 +158,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 result = await createTenantAction(tenantData);
                 if (result.success) {
                     toast({ 
-                        title: 'Tenant Created', 
+                        title: 'Tenant Created Successfully', 
                         description: `Share this link with the tenant to set their password: ${result.link}` ,
                         duration: 20000,
                     });
