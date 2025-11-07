@@ -26,7 +26,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant } from '@/lib/types';
-import { properties } from '@/lib/data';
 import { addTenant, updateTenant } from '@/lib/firebase/firestore';
 import { PlusCircle, Edit } from 'lucide-react';
 import {
@@ -36,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 const emptyTenant: Omit<Tenant, 'tenantId'> = {
   name: '',
@@ -47,9 +47,13 @@ const emptyTenant: Omit<Tenant, 'tenantId'> = {
 
 function TenantForm({ tenant, onSave }: { tenant: Partial<Tenant>, onSave: (tenant: Omit<Tenant, 'tenantId'>) => void }) {
   const t = useTranslation();
+  const context = useContext(AppContext);
   const [formData, setFormData] = useState<Omit<Tenant, 'tenantId'>>(
     {...emptyTenant, ...tenant}
   );
+
+  if (!context) return null;
+  const { properties } = context;
 
   const handleSave = () => {
     onSave(formData);
@@ -95,6 +99,7 @@ function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.R
     const t = useTranslation();
     const context = useContext(AppContext);
     const [open, setOpen] = useState(false);
+    const { toast } = useToast();
     
     if (!context) return null;
     const { refreshTenants } = context;
@@ -103,14 +108,16 @@ function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.R
         try {
             if (tenant?.tenantId) { // Editing
                 await updateTenant(tenant.tenantId, formData);
+                toast({ title: 'Tenant Updated' });
             } else { // Adding
                 await addTenant(formData);
+                toast({ title: 'Tenant Added' });
             }
             await refreshTenants();
             setOpen(false);
         } catch (error) {
             console.error("Failed to save tenant:", error);
-            // Optionally, show a toast notification on error
+            toast({ variant: 'destructive', title: 'Failed to save tenant', description: (error as Error).message });
         }
     };
 
@@ -135,7 +142,7 @@ export default function TenantManagement() {
 
   if (!context) return null;
 
-  const { tenants } = context;
+  const { tenants, properties } = context;
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';

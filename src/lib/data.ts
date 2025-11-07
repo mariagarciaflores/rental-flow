@@ -1,5 +1,6 @@
 import type { Property, Tenant, Invoice, Expense, InvoiceStatus } from './types';
 
+// This is now used for initial seeding or as fallback, but main data comes from Firestore
 export const properties: Property[] = [
   { propertyId: 'prop1', name: 'Main House A', address: '123 Maple St', adminId: 'admin1' },
   { propertyId: 'prop2', name: 'Apartment 102', address: '456 Oak Ave, Unit 102', adminId: 'admin1' },

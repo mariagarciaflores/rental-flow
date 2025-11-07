@@ -1,6 +1,6 @@
-import { collection, getDocs, addDoc, doc, updateDoc, getFirestore } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, getFirestore, deleteDoc } from "firebase/firestore";
 import { db } from "./client";
-import type { Tenant } from "@/lib/types";
+import type { Tenant, Property } from "@/lib/types";
 
 export async function getTenants(): Promise<Tenant[]> {
     const tenantsCol = collection(db, "tenants");
@@ -18,4 +18,29 @@ export async function addTenant(tenant: Omit<Tenant, 'tenantId'>): Promise<Tenan
 export async function updateTenant(tenantId: string, tenantData: Partial<Tenant>): Promise<void> {
     const tenantRef = doc(db, "tenants", tenantId);
     await updateDoc(tenantRef, tenantData);
+}
+
+export async function getProperties(): Promise<Property[]> {
+    const propertiesCol = collection(db, "properties");
+    const propertySnapshot = await getDocs(propertiesCol);
+    const propertyList = propertySnapshot.docs.map(doc => ({ propertyId: doc.id, ...doc.data() } as Property));
+    return propertyList;
+}
+
+export async function addProperty(property: Omit<Property, 'propertyId' | 'adminId'>): Promise<Property> {
+    // In a real app, adminId would come from the authenticated user.
+    const newProperty = { ...property, adminId: 'admin1' }; 
+    const propertiesCol = collection(db, "properties");
+    const docRef = await addDoc(propertiesCol, newProperty);
+    return { propertyId: docRef.id, ...newProperty };
+}
+
+export async function updateProperty(propertyId: string, propertyData: Partial<Property>): Promise<void> {
+    const propertyRef = doc(db, "properties", propertyId);
+    await updateDoc(propertyRef, propertyData);
+}
+
+export async function deleteProperty(propertyId: string): Promise<void> {
+    const propertyRef = doc(db, "properties", propertyId);
+    await deleteDoc(propertyRef);
 }
