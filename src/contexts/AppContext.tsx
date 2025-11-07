@@ -47,15 +47,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fetchUserRole = useCallback(async (uid: string) => {
     const userRole = await getUserRole(uid);
+    // If a specific role is found in the database, use it.
     if (userRole) {
       setRole(userRole);
+      // If the user is a tenant, their tenantId is their user ID.
       if (userRole === 'tenant') {
         setCurrentTenantId(uid);
       } else {
         setCurrentTenantId(null);
       }
     } else {
-      // Default to admin if no role is found (e.g. for manually created admins)
+      // Default to admin for users without a role doc (e.g., initial admin).
+      console.warn(`No role found for user ${uid}. Defaulting to admin.`);
       setRole('admin');
       setCurrentTenantId(null);
     }
@@ -74,21 +77,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProperties([]);
     }
   }, [user, fetchTenants, fetchProperties, fetchUserRole]);
+  
+  const handleSetRole = (newRole: Role) => {
+    setRole(newRole);
+    // This logic is primarily for the dev-mode role switcher.
+    if (newRole === 'tenant') {
+        // If the logged-in user's actual role is tenant, use their ID.
+        // Otherwise, for demo purposes, pick the first available tenant.
+        if (user && role === 'tenant') {
+             setCurrentTenantId(user.uid);
+        } else if (tenants.length > 0) {
+            setCurrentTenantId(tenants[0].tenantId);
+        } else {
+            setCurrentTenantId(null);
+        }
+    } else {
+        // Switching to admin view
+        setCurrentTenantId(null);
+    }
+  };
 
   return (
     <AppContext.Provider value={{ 
         language, setLanguage, 
-        role, setRole: (r) => {
-          setRole(r);
-          // When role is manually switched to tenant, find the first tenant and set it.
-          // Note: This is for dev/demo purposes. In a real app, you'd have a better way to select the tenant.
-          if (r === 'tenant' && tenants.length > 0) {
-            setCurrentTenantId(tenants[0].tenantId);
-          } else {
-            // If switching to admin, or no tenants, clear it.
-            setCurrentTenantId(null);
-          }
-        }, 
+        role, setRole: handleSetRole,
         invoices, setInvoices, 
         tenants, setTenants, 
         properties, setProperties,
