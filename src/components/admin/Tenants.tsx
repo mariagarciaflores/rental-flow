@@ -35,7 +35,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
-import type { Tenant } from '@/lib/types';
+import type { Tenant, Property } from '@/lib/types';
 import { addTenant, updateTenant, deleteTenant } from '@/lib/firebase/firestore';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
@@ -55,15 +55,11 @@ const emptyTenant: Omit<Tenant, 'tenantId'> = {
   paysUtilities: false,
 };
 
-function TenantForm({ tenant, onSave }: { tenant: Partial<Tenant>, onSave: (tenant: Omit<Tenant, 'tenantId'>) => void }) {
+function TenantForm({ tenant, properties, onSave }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenant: Omit<Tenant, 'tenantId'>) => void }) {
   const t = useTranslation();
-  const context = useContext(AppContext);
   const [formData, setFormData] = useState<Omit<Tenant, 'tenantId'>>(
     {...emptyTenant, ...tenant}
   );
-
-  if (!context) return null;
-  const { properties } = context;
 
   const handleSave = () => {
     onSave(formData);
@@ -105,7 +101,7 @@ function TenantForm({ tenant, onSave }: { tenant: Partial<Tenant>, onSave: (tena
   )
 }
 
-function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.ReactNode}) {
+function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, properties: Property[], children: React.ReactNode}) {
     const t = useTranslation();
     const context = useContext(AppContext);
     const [open, setOpen] = useState(false);
@@ -140,7 +136,7 @@ function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.R
                 <DialogHeader>
                     <DialogTitle>{tenant ? t('action.edit_tenant') : t('action.add_tenant')}</DialogTitle>
                 </DialogHeader>
-                <TenantForm tenant={tenant || {}} onSave={handleSave} />
+                <TenantForm tenant={tenant || {}} properties={properties} onSave={handleSave} />
             </DialogContent>
         </Dialog>
     )
@@ -178,7 +174,7 @@ export default function TenantManagement() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t('nav.tenants')}</CardTitle>
-        <TenantDialog>
+        <TenantDialog properties={properties}>
             <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 {t('action.add_tenant')}
@@ -202,7 +198,7 @@ export default function TenantManagement() {
                 <TableCell>{getPropertyName(tenant.propertyId)}</TableCell>
                 <TableCell>{tenant.contact}</TableCell>
                 <TableCell className="text-right space-x-2">
-                    <TenantDialog tenant={tenant}>
+                    <TenantDialog tenant={tenant} properties={properties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
                     </TenantDialog>
                      <AlertDialog>
