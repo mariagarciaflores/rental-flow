@@ -36,7 +36,8 @@ import { useTranslation } from '@/lib/i18n';
 import { AppContext } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Property } from '@/lib/types';
-import { addProperty, updateProperty, deleteProperty } from '@/lib/firebase/firestore';
+import { updateProperty, deleteProperty } from '@/lib/firebase/firestore';
+import { addProperty } from '@/app/actions';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 

@@ -5,7 +5,13 @@ import { getFirestore } from "firebase/firestore";
 import { firebaseConfig } from "./config";
 
 // Initialize Firebase for client-side
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+let app;
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 

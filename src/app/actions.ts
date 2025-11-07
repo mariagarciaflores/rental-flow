@@ -12,13 +12,13 @@ const VerifyReceiptActionInputSchema = z.object({
   propertyName: z.string(),
 });
 
-const TenantSchema = z.object({
-  name: z.string().min(1, { message: 'Name is required' }),
-  email: z.string().email({ message: 'Invalid email address' }),
-  phone: z.string().optional(),
-  propertyId: z.string().min(1, { message: 'Property is required' }),
-  fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
-  paysUtilities: z.boolean(),
+const TenantSchemaForCreation = z.object({
+    name: z.string().min(1, { message: 'Name is required' }),
+    email: z.string().email({ message: 'Invalid email address' }),
+    phone: z.string().optional(),
+    propertyId: z.string().min(1, { message: 'Property is required' }),
+    fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
+    paysUtilities: z.boolean(),
 });
 
 // A simple in-memory "database" of fake receipt data URIs
@@ -56,14 +56,14 @@ export async function verifyReceiptAction(formData: FormData) {
   }
 }
 
-export async function createTenantAction(tenantData: z.infer<typeof TenantSchema>) {
+export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>) {
     try {
-        const validatedData = TenantSchema.parse(tenantData);
+        const validatedData = TenantSchemaForCreation.parse(tenantData);
 
         // 1. Create user in Firebase Auth
         const userRecord = await adminAuth.createUser({
             email: validatedData.email,
-            emailVerified: false, // They will verify by setting password
+            emailVerified: false, 
             displayName: validatedData.name,
         });
 
@@ -74,22 +74,20 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             authUid: userRecord.uid, // Link to the auth user
         });
 
-        // 3. Generate password reset link to allow user to set their password
+        // 3. Generate password reset link
         const link = await adminAuth.generatePasswordResetLink(validatedData.email);
 
-        // 4. Send email (in a real app, use a proper email service like SendGrid, etc.)
-        // For this demo, we'll just log the action and the link.
+        // 4. Send email (simulation)
         console.log(`
             Tenant created: ${userRecord.uid}
             An email should be sent to ${validatedData.email} with the following link to set their password:
             ${link}
         `);
-        // Here you would integrate with your email provider to send the link.
 
         return { success: true };
 
     } catch (error: any) {
-        console.error("Create Tenant Action Failed: ", error);
+        console.error("Failed to save tenant: ", error);
         let errorMessage = 'An unknown error occurred.';
         if (error.code === 'auth/email-already-exists') {
             errorMessage = 'This email is already in use by another user.';
@@ -100,4 +98,11 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         }
         return { success: false, error: errorMessage };
     }
+}
+
+export async function addProperty(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
+    const newProperty = { ...property, adminId }; 
+    const propertiesCol = collection(adminDb, "properties");
+    const docRef = await addDoc(propertiesCol, newProperty);
+    return { propertyId: docRef.id, ...newProperty };
 }
