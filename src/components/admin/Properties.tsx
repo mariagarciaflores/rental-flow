@@ -36,8 +36,7 @@ import { useTranslation } from '@/lib/i18n';
 import { AppContext } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Property } from '@/lib/types';
-import { updateProperty, deleteProperty } from '@/lib/firebase/firestore';
-import { addProperty } from '@/app/actions';
+import { updatePropertyAction, deletePropertyAction, addPropertyAction } from '@/app/actions';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -91,11 +90,16 @@ function PropertyDialog({ property, children }: { property?: Property, children:
         }
 
         try {
+            let result;
             if (property?.propertyId) { // Editing
-                await updateProperty(property.propertyId, formData);
-                 toast({ title: 'Property Updated' });
+                result = await updatePropertyAction(property.propertyId, formData);
+                 if (result.success) {
+                    toast({ title: 'Property Updated' });
+                } else {
+                    throw new Error(result.error);
+                }
             } else { // Adding
-                await addProperty(formData, user.uid);
+                await addPropertyAction(formData, user.uid);
                 toast({ title: 'Property Added' });
             }
             await refreshProperties();
@@ -135,9 +139,13 @@ export default function PropertyList() {
 
   const handleDelete = async (propertyId: string) => {
     try {
-      await deleteProperty(propertyId);
-      await refreshProperties();
-      toast({ title: 'Property Deleted' });
+      const result = await deletePropertyAction(propertyId);
+      if (result.success) {
+        await refreshProperties();
+        toast({ title: 'Property Deleted' });
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error("Failed to delete property:", error);
       toast({ variant: 'destructive', title: 'Failed to delete property', description: (error as Error).message });

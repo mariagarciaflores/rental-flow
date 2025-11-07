@@ -36,8 +36,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property } from '@/lib/types';
-import { updateTenant, deleteTenant } from '@/lib/firebase/firestore';
-import { createTenantAction } from '@/app/actions';
+import { createTenantAction, updateTenantAction, deleteTenantAction } from '@/app/actions';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
     Select,
@@ -158,11 +157,16 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
 
     const handleSave = async (tenantData: any) => {
         try {
+            let result;
             if (tenant?.tenantId) { // Editing
-                await updateTenant(tenant.tenantId, tenantData);
-                toast({ title: 'Tenant Updated' });
+                result = await updateTenantAction(tenant.tenantId, tenantData);
+                 if (result.success) {
+                    toast({ title: 'Tenant Updated' });
+                } else {
+                    throw new Error(result.error);
+                }
             } else { // Adding
-                const result = await createTenantAction(tenantData);
+                result = await createTenantAction(tenantData);
                 if (result.success) {
                     toast({ title: 'Tenant Created', description: 'An invitation email has been sent to the tenant.' });
                 } else {
@@ -210,9 +214,13 @@ export default function TenantManagement() {
   
   const handleDelete = async (tenantId: string) => {
     try {
-      await deleteTenant(tenantId);
-      await refreshTenants();
-      toast({ title: 'Tenant Deleted' });
+      const result = await deleteTenantAction(tenantId);
+      if (result.success) {
+        await refreshTenants();
+        toast({ title: 'Tenant Deleted' });
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error("Failed to delete tenant:", error);
       toast({ variant: 'destructive', title: 'Failed to delete tenant', description: (error as Error).message });

@@ -3,7 +3,7 @@
 import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const VerifyReceiptActionInputSchema = z.object({
   invoiceId: z.string(),
@@ -20,6 +20,8 @@ const TenantSchemaForCreation = z.object({
     fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
     paysUtilities: z.boolean(),
 });
+
+const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true });
 
 // A simple in-memory "database" of fake receipt data URIs
 const receiptDataUris: Record<string, string> = {
@@ -100,9 +102,64 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
     }
 }
 
-export async function addProperty(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
+export async function updateTenantAction(tenantId: string, tenantData: z.infer<typeof TenantSchemaForEditing>): Promise<{success: boolean; error?: string}> {
+    try {
+        const validatedData = TenantSchemaForEditing.parse(tenantData);
+        const tenantRef = doc(adminDb, "tenants", tenantId);
+        await updateDoc(tenantRef, validatedData);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to update tenant:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function deleteTenantAction(tenantId: string): Promise<{success: boolean; error?: string}> {
+    try {
+        // Here you would also delete the corresponding Firebase Auth user
+        // const tenantDoc = await getDoc(doc(adminDb, "tenants", tenantId));
+        // const tenantData = tenantDoc.data();
+        // if (tenantData?.authUid) {
+        //   await adminAuth.deleteUser(tenantData.authUid);
+        // }
+        const tenantRef = doc(adminDb, "tenants", tenantId);
+        await deleteDoc(tenantRef);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete tenant:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function addPropertyAction(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
     const newProperty = { ...property, adminId }; 
     const propertiesCol = collection(adminDb, "properties");
     const docRef = await addDoc(propertiesCol, newProperty);
     return { propertyId: docRef.id, ...newProperty };
+}
+
+export async function updatePropertyAction(propertyId: string, propertyData: Partial<any>): Promise<{success: boolean; error?: string}> {
+    try {
+        const propertyRef = doc(adminDb, "properties", propertyId);
+        await updateDoc(propertyRef, propertyData);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to update property:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function deletePropertyAction(propertyId: string): Promise<{success: boolean; error?: string}> {
+    try {
+        const propertyRef = doc(adminDb, "properties", propertyId);
+        await deleteDoc(propertyRef);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to delete property:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+        return { success: false, error: errorMessage };
+    }
 }
