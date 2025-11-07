@@ -30,13 +30,10 @@ export default function TenantDashboard() {
   const context = useContext(AppContext);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
-  // In a real app, you'd get the current tenant from auth.
-  // Here we'll just pick the first one for demonstration.
-  const currentTenantId = 'tenant1';
-
-  const { invoices } = context!;
+  const { invoices, currentTenantId } = context!;
 
   const tenantInvoices = useMemo(() => {
+    if (!currentTenantId) return [];
     return invoices.filter(inv => inv.tenantId === currentTenantId);
   }, [invoices, currentTenantId]);
 
@@ -73,6 +70,18 @@ export default function TenantDashboard() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
+  
+  if (!currentTenantId) {
+    return (
+        <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+                Could not find tenant information for the logged-in user.
+            </AlertDescription>
+        </Alert>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -99,7 +108,7 @@ export default function TenantDashboard() {
         <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
           <CardTitle>{t('tenant.current_invoices')}</CardTitle>
           <div className="flex items-center gap-4 mt-4 md:mt-0">
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <Select value={selectedYear} onValueChange={setSelectedYear} disabled={availableYears.length === 0}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder={t('form.year')} />
               </SelectTrigger>

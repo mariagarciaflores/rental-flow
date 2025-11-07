@@ -1,11 +1,14 @@
 'use client';
 import { useTranslation } from '@/lib/i18n';
-import { Building2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Building2, LogOut } from 'lucide-react';
 import LanguageSwitcher from '../shared/LanguageSwitcher';
 import RoleSwitcher from '../shared/RoleSwitcher';
+import { Button } from '@/components/ui/button';
 
 export default function Header() {
   const t = useTranslation();
+  const { user, logout } = useAuth();
 
   return (
     <header className="border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10">
@@ -18,8 +21,16 @@ export default function Header() {
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <LanguageSwitcher />
-            <RoleSwitcher />
+            {user && (
+              <>
+                <LanguageSwitcher />
+                <RoleSwitcher />
+                <Button variant="ghost" size="icon" onClick={logout}>
+                  <LogOut className="h-5 w-5" />
+                  <span className="sr-only">Logout</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

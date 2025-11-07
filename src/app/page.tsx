@@ -1,19 +1,34 @@
 'use client';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useContext } from 'react';
 import Header from '@/components/layout/Header';
 import AdminView from '@/components/admin/AdminView';
 import TenantView from '@/components/tenant/TenantView';
+import LoginView from '@/components/auth/LoginView';
+import { Loader2 } from 'lucide-react';
 
 function App() {
   const context = useContext(AppContext);
+  const { user, loading } = useAuth();
 
   if (!context) {
-    // This should not happen as App is always wrapped in AppProvider
     return null;
   }
 
   const { role } = context;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginView />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -28,7 +43,9 @@ function App() {
 export default function Home() {
   return (
     <AppProvider>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </AppProvider>
   );
 }

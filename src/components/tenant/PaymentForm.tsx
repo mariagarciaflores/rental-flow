@@ -39,11 +39,10 @@ export function PaymentForm() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [fileName, setFileName] = useState('');
 
-  const currentTenantId = 'tenant1'; // Simulated auth
-
-  const { invoices, setInvoices } = context!;
+  const { invoices, setInvoices, currentTenantId } = context!;
 
   const pendingInvoices = useMemo(() => {
+    if (!currentTenantId) return [];
     return invoices.filter(inv => inv.tenantId === currentTenantId && inv.status !== 'PAID');
   }, [invoices, currentTenantId]);
 
@@ -70,15 +69,17 @@ export function PaymentForm() {
       .filter(inv => selectedInvoices.includes(inv.invoiceId))
       .reduce((sum, inv) => sum + inv.totalDue, 0);
 
-    const newStatus: InvoiceStatus = paymentAmount >= totalDueSelected ? 'PAID' : 'PARTIAL';
+    const newStatus: InvoiceStatus = paymentAmount >= totalDueSelected ? 'PENDING' : 'PARTIAL';
 
     setInvoices(prev => prev.map(inv => {
       if (selectedInvoices.includes(inv.invoiceId)) {
         return {
           ...inv,
-          status: newStatus,
+          // Set to PENDING for admin verification, not directly to PAID
+          status: newStatus, 
           paymentProofUrl: PlaceHolderImages[0].imageUrl, // Simulated upload
-          submittedPaymentAmount: (inv.submittedPaymentAmount || 0) + paymentAmount, // simplistic for demo
+          // This logic is simplistic. A real app would handle partial payments better.
+          submittedPaymentAmount: (inv.submittedPaymentAmount || 0) + paymentAmount,
           submissionDate: new Date().toISOString(),
         };
       }
@@ -87,7 +88,7 @@ export function PaymentForm() {
 
     toast({
       title: 'Payment Submitted',
-      description: 'Your payment is being processed for verification.',
+      description: 'Your payment has been submitted for verification by the property manager.',
     });
 
     setOpen(false);
@@ -101,7 +102,7 @@ export function PaymentForm() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={pendingInvoices.length === 0}>
           <CreditCard className="mr-2 h-4 w-4" />
           {t('action.submit_payment')}
         </Button>
@@ -113,7 +114,7 @@ export function PaymentForm() {
         </DialogHeader>
         <div className="grid gap-4 py-4">
             <Card>
-                <CardContent className="p-0">
+                <CardContent className="p-0 max-h-60 overflow-y-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
