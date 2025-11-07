@@ -45,30 +45,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProperties(propertiesFromDb);
   }, []);
 
-  const fetchUserRole = useCallback(async (uid: string) => {
-    const userRole = await getUserRole(uid);
-    // If a specific role is found in the database, use it.
-    if (userRole) {
-      setRole(userRole);
-      // If the user is a tenant, their tenantId is their user ID.
+  useEffect(() => {
+    const initializeUser = async (uid: string) => {
+      // Fetch user role first
+      const userRole = await getUserRole(uid);
+
       if (userRole === 'tenant') {
+        setRole('tenant');
         setCurrentTenantId(uid);
       } else {
+        // Default to 'admin' for any other case (explicit 'admin' role or no role doc found)
+        setRole('admin');
         setCurrentTenantId(null);
       }
-    } else {
-      // Default to admin for users without a role doc (e.g., initial admin).
-      console.warn(`No role found for user ${uid}. Defaulting to admin.`);
-      setRole('admin');
-      setCurrentTenantId(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if(user) {
+      
+      // Fetch tenants and properties for all users
       fetchTenants();
       fetchProperties();
-      fetchUserRole(user.uid);
+    };
+
+    if (user) {
+      initializeUser(user.uid);
     } else {
       // Reset state on logout
       setRole(null);
@@ -76,17 +73,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTenants([]);
       setProperties([]);
     }
-  }, [user, fetchTenants, fetchProperties, fetchUserRole]);
+  }, [user, fetchTenants, fetchProperties]);
   
   const handleSetRole = (newRole: Role) => {
+    // This function is primarily for the dev-mode role switcher.
+    // It should not override the actual user role logic on login.
     setRole(newRole);
-    // This logic is primarily for the dev-mode role switcher.
     if (newRole === 'tenant') {
-        // If the logged-in user's actual role is tenant, use their ID.
-        // Otherwise, for demo purposes, pick the first available tenant.
+        // If the logged-in user is actually a tenant, use their ID
         if (user && role === 'tenant') {
              setCurrentTenantId(user.uid);
         } else if (tenants.length > 0) {
+            // For demo purposes, pick the first tenant if the admin is just switching views
             setCurrentTenantId(tenants[0].tenantId);
         } else {
             setCurrentTenantId(null);
