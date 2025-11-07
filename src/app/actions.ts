@@ -62,7 +62,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 
         // 2. Add tenant data to Firestore
         const tenantsCol = adminDb.collection('tenants');
-        await addDoc(tenantsCol, {
+        await tenantsCol.add({
             ...validatedData,
             authUid: userRecord.uid, // Link to the auth user
         });
@@ -127,7 +127,7 @@ export async function deleteTenantAction(tenantId: string): Promise<{success: bo
 export async function addPropertyAction(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
     const newProperty = { ...property, adminId }; 
     const propertiesCol = adminDb.collection("properties");
-    const docRef = await addDoc(propertiesCol, newProperty);
+    const docRef = await propertiesCol.add(newProperty);
     return { propertyId: docRef.id, ...newProperty };
 }
 
