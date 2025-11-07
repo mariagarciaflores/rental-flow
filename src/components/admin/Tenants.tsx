@@ -159,7 +159,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 if (result.success) {
                     toast({ 
                         title: 'Tenant Created Successfully', 
-                        description: `Share this link with the tenant to set their password: ${result.link}` ,
+                        description: `Share this link with the tenant to set their password: ${result.link}`,
                         duration: 20000,
                     });
                 } else {
@@ -222,13 +222,16 @@ export default function TenantManagement() {
     }
   };
 
-  const handleCopyLink = (tenant: Tenant) => {
+  const handleGenerateLink = (tenant: Tenant) => {
     setGeneratingFor(tenant.tenantId);
     startTransition(async () => {
         const result = await generateAndCopyTenantPasswordLinkAction(tenant.email);
         if (result.success && result.link) {
-            await navigator.clipboard.writeText(result.link);
-            toast({ title: 'Link Copied!', description: `Password reset link for ${tenant.name} copied to clipboard.`});
+            toast({ 
+                title: 'Password Link Generated', 
+                description: `Please copy and share this link with ${tenant.name}: ${result.link}`,
+                duration: 20000,
+            });
         } else {
             toast({ variant: 'destructive', title: 'Failed to generate link', description: result.error });
         }
@@ -266,9 +269,9 @@ export default function TenantManagement() {
                 <TableCell>{tenant.email}</TableCell>
                 <TableCell>{tenant.phone}</TableCell>
                 <TableCell className="text-right space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleCopyLink(tenant)} disabled={isPending && generatingFor === tenant.tenantId}>
+                    <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(tenant)} disabled={isPending && generatingFor === tenant.tenantId}>
                         {isPending && generatingFor === tenant.tenantId ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4"/>}
-                        <span className="sr-only">Copy password link</span>
+                        <span className="sr-only">Generate password link</span>
                     </Button>
                     <TenantDialog tenant={tenant} properties={properties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
