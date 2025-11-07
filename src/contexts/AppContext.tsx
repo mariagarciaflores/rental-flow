@@ -1,8 +1,9 @@
 'use client';
 import { createContext, useState, ReactNode, Dispatch, SetStateAction, useEffect } from 'react';
 import type { Invoice, Tenant } from '@/lib/types';
-import { invoices as initialInvoices, tenants as initialTenants } from '@/lib/data';
+import { invoices as initialInvoices } from '@/lib/data';
 import { useAuth } from './AuthContext';
+import { getTenants } from '@/lib/firebase/firestore';
 
 export type Language = 'en' | 'es';
 export type Role = 'admin' | 'tenant';
@@ -17,6 +18,7 @@ interface AppContextType {
   tenants: Tenant[];
   setTenants: Dispatch<SetStateAction<Tenant[]>>;
   currentTenantId: string | null;
+  refreshTenants: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -25,9 +27,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
   const [role, setRole] = useState<Role>('admin');
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const { user } = useAuth() || {}; // Use default empty object if useAuth returns null during SSR
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
+
+  const fetchTenants = async () => {
+    const tenantsFromDb = await getTenants();
+    setTenants(tenantsFromDb);
+  };
+
+  useEffect(() => {
+    if(user) {
+      fetchTenants();
+    }
+  }, [user]);
 
   useEffect(() => {
     // In a real app, you would fetch the user's role and tenant mapping
@@ -58,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   return (
-    <AppContext.Provider value={{ language, setLanguage, role, setRole, invoices, setInvoices, tenants, setTenants, currentTenantId }}>
+    <AppContext.Provider value={{ language, setLanguage, role, setRole, invoices, setInvoices, tenants, setTenants, currentTenantId, refreshTenants: fetchTenants }}>
       {children}
     </AppContext.Provider>
   );

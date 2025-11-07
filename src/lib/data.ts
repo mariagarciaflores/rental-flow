@@ -5,6 +5,7 @@ export const properties: Property[] = [
   { propertyId: 'prop2', name: 'Apartment 102', address: '456 Oak Ave, Unit 102', adminId: 'admin1' },
 ];
 
+// This is now used for initial seeding or as fallback, but main data comes from Firestore
 export const tenants: Tenant[] = [
   { tenantId: 'tenant1', name: 'John Doe', contact: 'john.doe@email.com', propertyId: 'prop1', fixedMonthlyRent: 1200, paysUtilities: true },
   { tenantId: 'tenant2', name: 'Jane Smith', contact: 'jane.smith@email.com', propertyId: 'prop2', fixedMonthlyRent: 850, paysUtilities: false },

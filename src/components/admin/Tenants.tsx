@@ -27,6 +27,7 @@ import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant } from '@/lib/types';
 import { properties } from '@/lib/data';
+import { addTenant, updateTenant } from '@/lib/firebase/firestore';
 import { PlusCircle, Edit } from 'lucide-react';
 import {
     Select,
@@ -96,15 +97,21 @@ function TenantDialog({ tenant, children }: { tenant?: Tenant, children: React.R
     const [open, setOpen] = useState(false);
     
     if (!context) return null;
-    const { setTenants } = context;
+    const { refreshTenants } = context;
 
-    const handleSave = (formData: Omit<Tenant, 'tenantId'>) => {
-        if (tenant) { // Editing
-            setTenants(prev => prev.map(t => t.tenantId === tenant.tenantId ? {...tenant, ...formData} : t));
-        } else { // Adding
-            setTenants(prev => [...prev, { tenantId: `tenant-${Date.now()}`, ...formData }]);
+    const handleSave = async (formData: Omit<Tenant, 'tenantId'>) => {
+        try {
+            if (tenant?.tenantId) { // Editing
+                await updateTenant(tenant.tenantId, formData);
+            } else { // Adding
+                await addTenant(formData);
+            }
+            await refreshTenants();
+            setOpen(false);
+        } catch (error) {
+            console.error("Failed to save tenant:", error);
+            // Optionally, show a toast notification on error
         }
-        setOpen(false);
     };
 
     return (
