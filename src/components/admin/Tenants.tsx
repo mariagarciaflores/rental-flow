@@ -37,7 +37,7 @@ import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property } from '@/lib/types';
 import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
-import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2, Copy } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -160,11 +160,9 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                     toast({ 
                         title: 'Tenant Created Successfully', 
                         description: (
-                            <div>
+                            <div className="space-y-2">
                                 <p>Share this link with the tenant to set their password:</p>
-                                <pre className="mt-2 rounded-md bg-slate-950 p-2 font-mono text-slate-50 text-sm break-all whitespace-pre-wrap">
-                                    {result.link}
-                                </pre>
+                                <Input type="text" readOnly value={result.link} className="bg-muted" />
                             </div>
                         ),
                         duration: 20000,
@@ -237,11 +235,9 @@ export default function TenantManagement() {
             toast({ 
                 title: 'Password Link Generated', 
                 description: (
-                    <div>
+                    <div className="space-y-2">
                         <p>Please copy and share this link with {tenant.name}:</p>
-                        <pre className="mt-2 rounded-md bg-slate-950 p-2 font-mono text-slate-50 text-sm break-all whitespace-pre-wrap">
-                            {result.link}
-                        </pre>
+                        <Input type="text" readOnly value={result.link} className="bg-muted"/>
                     </div>
                 ),
                 duration: 20000,
