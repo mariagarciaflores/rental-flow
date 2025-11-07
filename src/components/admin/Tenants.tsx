@@ -36,7 +36,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property } from '@/lib/types';
-import { addTenant, updateTenant, deleteTenant } from '@/lib/firebase/firestore';
+import { updateTenant, deleteTenant } from '@/lib/firebase/firestore';
+import { createTenantAction } from '@/app/actions';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import {
     Select,
@@ -46,49 +47,87 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
 
 const emptyTenant: Omit<Tenant, 'tenantId'> = {
   name: '',
-  contact: '',
+  email: '',
+  phone: '',
   propertyId: '',
   fixedMonthlyRent: 0,
   paysUtilities: false,
 };
 
-function TenantForm({ tenant, properties, onSave }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenant: Omit<Tenant, 'tenantId'>) => void }) {
+const TenantSchema = z.object({
+    name: z.string().min(1, { message: 'Name is required' }),
+    email: z.string().email({ message: 'Invalid email address' }),
+    phone: z.string().optional(),
+    propertyId: z.string().min(1, { message: 'Property is required' }),
+    fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
+    paysUtilities: z.boolean(),
+});
+
+function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenant: Omit<Tenant, 'tenantId'>) => void, isEditing: boolean }) {
   const t = useTranslation();
   const [formData, setFormData] = useState<Omit<Tenant, 'tenantId'>>(
     {...emptyTenant, ...tenant}
   );
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
-    onSave(formData);
+    const result = TenantSchema.safeParse(formData);
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        newErrors[issue.path[0]] = issue.message;
+      }
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
+    onSave(result.data);
   };
   
   return (
      <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">{t('form.name')}</Label>
-            <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                {errors.name && <p className="text-destructive text-sm mt-1">{errors.name}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="contact" className="text-right">{t('form.contact')}</Label>
-            <Input id="contact" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} className="col-span-3" />
+            <Label htmlFor="email" className="text-right">Email</Label>
+             <div className="col-span-3">
+                <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} disabled={isEditing} />
+                {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
+            </div>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phone" className="text-right">Phone</Label>
+            <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="col-span-3" />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="property" className="text-right">{t('form.property')}</Label>
-            <Select value={formData.propertyId} onValueChange={value => setFormData({...formData, propertyId: value})}>
-                <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                    {properties.map(p => <SelectItem key={p.propertyId} value={p.propertyId}>{p.name}</SelectItem>)}
-                </SelectContent>
-            </Select>
+            <div className="col-span-3">
+                <Select value={formData.propertyId} onValueChange={value => setFormData({...formData, propertyId: value})}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select a property" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {properties.map(p => <SelectItem key={p.propertyId} value={p.propertyId}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                {errors.propertyId && <p className="text-destructive text-sm mt-1">{errors.propertyId}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="rent" className="text-right">{t('form.rent')}</Label>
-            <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => setFormData({...formData, fixedMonthlyRent: Number(e.target.value)})} className="col-span-3" />
+             <div className="col-span-3">
+                <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => setFormData({...formData, fixedMonthlyRent: Number(e.target.value)})} />
+                {errors.fixedMonthlyRent && <p className="text-destructive text-sm mt-1">{errors.fixedMonthlyRent}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
              <Label htmlFor="paysUtilities" className="text-right">{t('form.pays_utilities')}</Label>
@@ -116,8 +155,12 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 await updateTenant(tenant.tenantId, formData);
                 toast({ title: 'Tenant Updated' });
             } else { // Adding
-                await addTenant(formData);
-                toast({ title: 'Tenant Added' });
+                const result = await createTenantAction(formData);
+                if (result.success) {
+                    toast({ title: 'Tenant Created', description: 'An email has been sent to the tenant to set up their account.' });
+                } else {
+                    throw new Error(result.error);
+                }
             }
             await refreshTenants();
             setOpen(false);
@@ -136,7 +179,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 <DialogHeader>
                     <DialogTitle>{tenant ? t('action.edit_tenant') : t('action.add_tenant')}</DialogTitle>
                 </DialogHeader>
-                <TenantForm tenant={tenant || {}} properties={properties} onSave={handleSave} />
+                <TenantForm tenant={tenant || {}} properties={properties} onSave={handleSave} isEditing={!!tenant} />
             </DialogContent>
         </Dialog>
     )
@@ -147,13 +190,12 @@ export default function TenantManagement() {
   const context = useContext(AppContext);
   const { toast } = useToast();
 
-  if (!context) return null;
-
-  const { tenants, properties, refreshTenants } = context;
-
   useEffect(() => {
-    refreshTenants();
+    context?.refreshTenants();
   }, []);
+
+  if (!context) return null;
+  const { tenants, properties, refreshTenants } = context;
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';
@@ -187,7 +229,8 @@ export default function TenantManagement() {
             <TableRow>
               <TableHead>{t('table.header.tenant')}</TableHead>
               <TableHead>{t('table.header.property')}</TableHead>
-              <TableHead>{t('form.contact')}</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
               <TableHead className="text-right">{t('table.header.actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -196,7 +239,8 @@ export default function TenantManagement() {
               <TableRow key={tenant.tenantId}>
                 <TableCell className="font-medium">{tenant.name}</TableCell>
                 <TableCell>{getPropertyName(tenant.propertyId)}</TableCell>
-                <TableCell>{tenant.contact}</TableCell>
+                <TableCell>{tenant.email}</TableCell>
+                <TableCell>{tenant.phone}</TableCell>
                 <TableCell className="text-right space-x-2">
                     <TenantDialog tenant={tenant} properties={properties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
@@ -209,7 +253,7 @@ export default function TenantManagement() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the tenant.
+                            This action cannot be undone. This will permanently delete the tenant and their associated login.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

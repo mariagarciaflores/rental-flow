@@ -8,7 +8,8 @@ export interface Property {
 export interface Tenant {
   tenantId: string;
   name: string;
-  contact: string;
+  email: string;
+  phone?: string;
   propertyId: string;
   fixedMonthlyRent: number;
   paysUtilities: boolean;

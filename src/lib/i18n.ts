@@ -171,7 +171,13 @@ export function useTranslation() {
   }
   const { language } = context;
 
-  return (key: TranslationKey) => {
-    return translations[language][key] || key;
+  return (key: TranslationKey, ...args: any[]) => {
+    let translation = translations[language][key] || key;
+    if (args.length > 0) {
+      translation = translation.replace(/{(\d+)}/g, (match, number) => {
+        return typeof args[number] !== 'undefined' ? args[number] : match;
+      });
+    }
+    return translation;
   };
 }
