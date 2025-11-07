@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -154,6 +154,10 @@ export default function TenantManagement() {
   if (!context) return null;
 
   const { tenants, properties, refreshTenants } = context;
+
+  useEffect(() => {
+    refreshTenants();
+  }, []);
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';
