@@ -42,10 +42,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
   const fetchProperties = async () => {
     const propertiesFromDb = await getProperties();
+    console.log("Fetch Properties ", propertiesFromDb)
     setProperties(propertiesFromDb);
   };
 
   useEffect(() => {
+    console.log("COntext use effect", user)
     if(user) {
       fetchTenants();
       fetchProperties();
