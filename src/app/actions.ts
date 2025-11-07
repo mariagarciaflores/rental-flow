@@ -4,6 +4,8 @@ import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/veri
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
+
 
 const VerifyReceiptActionInputSchema = z.object({
   invoiceId: z.string(),
@@ -11,17 +13,6 @@ const VerifyReceiptActionInputSchema = z.object({
   tenantName: z.string(),
   propertyName: z.string(),
 });
-
-const TenantSchemaForCreation = z.object({
-    name: z.string().min(1, { message: 'Name is required' }),
-    email: z.string().email({ message: 'Invalid email address' }),
-    phone: z.string().optional(),
-    propertyId: z.string().min(1, { message: 'Property is required' }),
-    fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
-    paysUtilities: z.boolean(),
-});
-
-const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true });
 
 // A simple in-memory "database" of fake receipt data URIs
 const receiptDataUris: Record<string, string> = {
