@@ -57,15 +57,29 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             emailVerified: false, 
             displayName: validatedData.name,
         });
+        
+        const batch = adminDb.batch();
 
-        // 2. Add tenant data to Firestore
-        const tenantsCol = adminDb.collection('tenants');
-        await tenantsCol.doc(userRecord.uid).set({
-            ...validatedData,
-            authUid: userRecord.uid,
+        // 2. Add user data to 'users' collection with role
+        const userRef = adminDb.collection('users').doc(userRecord.uid);
+        batch.set(userRef, {
+            uid: userRecord.uid,
+            email: validatedData.email,
+            displayName: validatedData.name,
+            role: 'tenant'
         });
 
-        // 3. Generate password reset link (which is used for initial password setup)
+        // 3. Add tenant data to Firestore
+        const tenantRef = adminDb.collection('tenants').doc(userRecord.uid);
+        batch.set(tenantRef, {
+            ...validatedData,
+            authUid: userRecord.uid,
+            tenantId: userRecord.uid // Use auth UID as tenantId
+        });
+
+        await batch.commit();
+
+        // 4. Generate password reset link (which is used for initial password setup)
         const link = await adminAuth.generatePasswordResetLink(validatedData.email);
 
         return { success: true, link: link };
@@ -100,17 +114,21 @@ export async function updateTenantAction(tenantId: string, tenantData: z.infer<t
 
 export async function deleteTenantAction(tenantId: string): Promise<{success: boolean; error?: string}> {
     try {
-        const tenantRef = adminDb.collection("tenants").doc(tenantId);
-        const tenantDoc = await tenantRef.get();
-        const tenantData = tenantDoc.data();
+        // In a real app, you might want to handle this in a transaction
         
         // Delete auth user first
-        if (tenantData?.authUid) {
-          await adminAuth.deleteUser(tenantData.authUid);
-        }
+        await adminAuth.deleteUser(tenantId);
         
-        // Then delete firestore doc
-        await tenantRef.delete();
+        // Then delete firestore docs
+        const tenantRef = adminDb.collection("tenants").doc(tenantId);
+        const userRef = adminDb.collection("users").doc(tenantId);
+
+        const batch = adminDb.batch();
+        batch.delete(tenantRef);
+        batch.delete(userRef);
+        
+        await batch.commit();
+
         return { success: true };
     } catch (error: any) {
         console.error("Failed to delete tenant:", error);

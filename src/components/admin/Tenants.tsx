@@ -37,7 +37,7 @@ import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property } from '@/lib/types';
 import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
-import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2, Copy } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
 import {
     Select,
     SelectContent,
