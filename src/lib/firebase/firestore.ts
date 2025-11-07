@@ -27,9 +27,8 @@ export async function getProperties(): Promise<Property[]> {
     return propertyList;
 }
 
-export async function addProperty(property: Omit<Property, 'propertyId' | 'adminId'>): Promise<Property> {
-    // In a real app, adminId would come from the authenticated user.
-    const newProperty = { ...property, adminId: 'admin1' }; 
+export async function addProperty(property: Omit<Property, 'propertyId' | 'adminId'>, adminId: string): Promise<Property> {
+    const newProperty = { ...property, adminId }; 
     const propertiesCol = collection(db, "properties");
     const docRef = await addDoc(propertiesCol, newProperty);
     return { propertyId: docRef.id, ...newProperty };

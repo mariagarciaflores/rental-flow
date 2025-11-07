@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/lib/i18n';
 import { AppContext } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Property } from '@/lib/types';
 import { addProperty, updateProperty, deleteProperty } from '@/lib/firebase/firestore';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
@@ -75,6 +76,7 @@ function PropertyForm({ property, onSave }: { property: Partial<Property>, onSav
 function PropertyDialog({ property, children }: { property?: Property, children: React.ReactNode}) {
     const t = useTranslation();
     const context = useContext(AppContext);
+    const { user } = useAuth()!;
     const [open, setOpen] = useState(false);
     const { toast } = useToast();
     
@@ -82,12 +84,17 @@ function PropertyDialog({ property, children }: { property?: Property, children:
     const { refreshProperties } = context;
 
     const handleSave = async (formData: Omit<Property, 'propertyId' | 'adminId'>) => {
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to save a property.' });
+            return;
+        }
+
         try {
             if (property?.propertyId) { // Editing
                 await updateProperty(property.propertyId, formData);
                  toast({ title: 'Property Updated' });
             } else { // Adding
-                await addProperty(formData);
+                await addProperty(formData, user.uid);
                 toast({ title: 'Property Added' });
             }
             await refreshProperties();
