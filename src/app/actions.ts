@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
-import { addDoc, updateDoc, deleteDoc, doc } from 'firebase-admin/firestore';
+import { addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase-admin/firestore';
 
 
 const VerifyReceiptActionInputSchema = z.object({
@@ -49,7 +49,7 @@ export async function verifyReceiptAction(formData: FormData) {
   }
 }
 
-export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>) {
+export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>): Promise<{success: boolean, link?: string, error?: string}> {
     try {
         const validatedData = TenantSchemaForCreation.parse(tenantData);
 
@@ -67,17 +67,10 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             authUid: userRecord.uid, // Link to the auth user
         });
 
-        // 3. Generate password reset link
+        // 3. Generate password reset link (which is used for initial password setup)
         const link = await adminAuth.generatePasswordResetLink(validatedData.email);
 
-        // 4. Send email (simulation)
-        console.log(`
-            Tenant created: ${userRecord.uid}
-            An email should be sent to ${validatedData.email} with the following link to set their password:
-            ${link}
-        `);
-
-        return { success: true };
+        return { success: true, link: link };
 
     } catch (error: any) {
         console.error("Failed to save tenant: ", error);
@@ -92,6 +85,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         return { success: false, error: errorMessage };
     }
 }
+
 
 export async function updateTenantAction(tenantId: string, tenantData: z.infer<typeof TenantSchemaForEditing>): Promise<{success: boolean; error?: string}> {
     try {

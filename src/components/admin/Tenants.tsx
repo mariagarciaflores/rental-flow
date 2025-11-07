@@ -157,7 +157,11 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
             } else { // Adding
                 result = await createTenantAction(tenantData);
                 if (result.success) {
-                    toast({ title: 'Tenant Created', description: 'An invitation email has been sent to the tenant.' });
+                    toast({ 
+                        title: 'Tenant Created', 
+                        description: `Share this link with the tenant to set their password: ${result.link}` ,
+                        duration: 20000,
+                    });
                 } else {
                     throw new Error(result.error);
                 }
