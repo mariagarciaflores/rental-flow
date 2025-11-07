@@ -1,10 +1,10 @@
 'use server';
 
-import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase-admin/firestore';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
+import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
+import { addDoc, updateDoc, deleteDoc, doc } from 'firebase-admin/firestore';
 
 
 const VerifyReceiptActionInputSchema = z.object({
@@ -61,7 +61,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         });
 
         // 2. Add tenant data to Firestore
-        const tenantsCol = collection(adminDb, 'tenants');
+        const tenantsCol = adminDb.collection('tenants');
         await addDoc(tenantsCol, {
             ...validatedData,
             authUid: userRecord.uid, // Link to the auth user
@@ -126,7 +126,7 @@ export async function deleteTenantAction(tenantId: string): Promise<{success: bo
 
 export async function addPropertyAction(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
     const newProperty = { ...property, adminId }; 
-    const propertiesCol = collection(adminDb, "properties");
+    const propertiesCol = adminDb.collection("properties");
     const docRef = await addDoc(propertiesCol, newProperty);
     return { propertyId: docRef.id, ...newProperty };
 }
