@@ -70,13 +70,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Reset state on logout
       setRole(null);
       setCurrentTenantId(null);
+      setTenants([]);
+      setProperties([]);
     }
   }, [user, fetchTenants, fetchProperties, fetchUserRole]);
 
   return (
     <AppContext.Provider value={{ 
         language, setLanguage, 
-        role, setRole: (r) => setRole(r), 
+        role, setRole: (r) => {
+          setRole(r);
+          // When role is manually switched to tenant, find the first tenant and set it.
+          // Note: This is for dev/demo purposes. In a real app, you'd have a better way to select the tenant.
+          if (r === 'tenant' && tenants.length > 0) {
+            setCurrentTenantId(tenants[0].tenantId);
+          } else {
+            // If switching to admin, or no tenants, clear it.
+            setCurrentTenantId(null);
+          }
+        }, 
         invoices, setInvoices, 
         tenants, setTenants, 
         properties, setProperties,
