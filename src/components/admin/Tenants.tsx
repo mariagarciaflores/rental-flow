@@ -49,16 +49,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
-const emptyTenant: Omit<Tenant, 'tenantId'> = {
-  name: '',
-  email: '',
-  phone: '',
-  propertyId: '',
-  fixedMonthlyRent: 0,
-  paysUtilities: false,
-};
-
-const TenantSchema = z.object({
+const TenantSchemaForCreation = z.object({
     name: z.string().min(1, { message: 'Name is required' }),
     email: z.string().email({ message: 'Invalid email address' }),
     phone: z.string().optional(),
@@ -67,15 +58,31 @@ const TenantSchema = z.object({
     paysUtilities: z.boolean(),
 });
 
-function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenant: Omit<Tenant, 'tenantId'>) => void, isEditing: boolean }) {
+
+const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true });
+
+
+const emptyTenant: z.infer<typeof TenantSchemaForCreation> = {
+  name: '',
+  email: '',
+  phone: '',
+  propertyId: '',
+  fixedMonthlyRent: 0,
+  paysUtilities: false,
+};
+
+
+function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
-  const [formData, setFormData] = useState<Omit<Tenant, 'tenantId'>>(
+  const [formData, setFormData] = useState(
     {...emptyTenant, ...tenant}
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
-    const result = TenantSchema.safeParse(formData);
+    const schema = isEditing ? TenantSchemaForEditing : TenantSchemaForCreation;
+    const result = schema.safeParse(formData);
+
     if (!result.success) {
       const newErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
@@ -149,15 +156,15 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
     if (!context) return null;
     const { refreshTenants } = context;
 
-    const handleSave = async (formData: Omit<Tenant, 'tenantId'>) => {
+    const handleSave = async (tenantData: any) => {
         try {
             if (tenant?.tenantId) { // Editing
-                await updateTenant(tenant.tenantId, formData);
+                await updateTenant(tenant.tenantId, tenantData);
                 toast({ title: 'Tenant Updated' });
             } else { // Adding
-                const result = await createTenantAction(formData);
+                const result = await createTenantAction(tenantData);
                 if (result.success) {
-                    toast({ title: 'Tenant Created', description: 'An email has been sent to the tenant to set up their account.' });
+                    toast({ title: 'Tenant Created', description: 'An invitation email has been sent to the tenant.' });
                 } else {
                     throw new Error(result.error);
                 }

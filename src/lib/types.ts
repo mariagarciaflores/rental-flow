@@ -13,6 +13,7 @@ export interface Tenant {
   propertyId: string;
   fixedMonthlyRent: number;
   paysUtilities: boolean;
+  authUid?: string; // Link to Firebase Auth user
 }
 
 export type InvoiceStatus = 'PENDING' | 'PARTIAL' | 'PAID';
@@ -20,6 +21,7 @@ export type InvoiceStatus = 'PENDING' | 'PARTIAL' | 'PAID';
 export interface Invoice {
   invoiceId: string;
   tenantId: string;
+
   month: string; // YYYY-MM
   fixedRentAmount: number;
   utilityFees: number;

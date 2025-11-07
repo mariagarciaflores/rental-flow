@@ -42,12 +42,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   
   const fetchProperties = async () => {
     const propertiesFromDb = await getProperties();
-    console.log("Fetch Properties ", propertiesFromDb)
     setProperties(propertiesFromDb);
   };
 
   useEffect(() => {
-    console.log("COntext use effect", user)
     if(user) {
       fetchTenants();
       fetchProperties();
@@ -58,21 +56,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // In a real app, you would fetch the user's role and tenant mapping
     // from your database based on their auth UID (user.uid)
     if (user) {
-        // Simple logic for demo: if email contains 'tenant', they are a tenant.
-        const isTenant = user.email?.includes('tenant');
-        const userRole = isTenant ? 'tenant' : 'admin';
-        setRole(userRole);
+        // Find the tenant that matches the logged-in user's auth UID
+        const matchedTenant = tenants.find(t => t.authUid === user.uid);
 
-        if (isTenant) {
-            // Find the tenant that matches the logged-in user's email
-            const matchedTenant = tenants.find(t => t.contact === user.email);
-            if (matchedTenant) {
-                setCurrentTenantId(matchedTenant.tenantId);
-            } else {
-                 // For demo, if no match, default to first tenant
-                setCurrentTenantId(tenants[0]?.tenantId || null);
-            }
+        if (matchedTenant) {
+            setRole('tenant');
+            setCurrentTenantId(matchedTenant.tenantId);
         } else {
+            // If no tenant record matches, assume admin.
+            // This is a simplification for the demo.
+            setRole('admin');
             setCurrentTenantId(null);
         }
     } else {
