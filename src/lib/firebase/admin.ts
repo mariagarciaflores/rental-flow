@@ -5,33 +5,33 @@ import { firebaseConfig } from './config';
 
 // This is a server-only file.
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
   : undefined;
 
-let adminApp: App;
+// Function to get or initialize the admin app
+function getAdminApp(): App {
+  if (getApps().some((app) => app.name === 'admin')) {
+    return getApp('admin');
+  }
 
-if (getApps().some((app) => app.name === 'admin')) {
-  adminApp = getApp('admin');
-} else {
-  // In a local development environment, the Admin SDK can be initialized without credentials.
-  // This is useful for running server actions locally.
-  // In a deployed environment, you MUST provide a service account.
-  if (serviceAccount) {
-    adminApp = initializeApp(
+  if (serviceAccountKey) {
+    return initializeApp(
       {
-        credential: cert(serviceAccount),
+        credential: cert(serviceAccountKey),
         databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`,
       },
       'admin'
     );
-  } else {
-    console.warn("Firebase Admin SDK initialized without a service account. This is for local development only.");
-    adminApp = initializeApp({
-        projectId: firebaseConfig.projectId
-    }, 'admin');
   }
+  
+  // For local development without service account
+  console.warn("Firebase Admin SDK initialized without a service account. This is for local development only.");
+  return initializeApp({
+      projectId: firebaseConfig.projectId
+  }, 'admin');
 }
 
+const adminApp = getAdminApp();
 export const adminAuth = getAuth(adminApp);
 export const adminDb = getFirestore(adminApp);
