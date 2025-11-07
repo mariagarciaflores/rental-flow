@@ -8,15 +8,9 @@ import TenantView from '@/components/tenant/TenantView';
 import LoginView from '@/components/auth/LoginView';
 import { Loader2 } from 'lucide-react';
 
-function App() {
+function AppContent() {
   const context = useContext(AppContext);
-  const { user, loading } = useAuth();
-
-  if (!context) {
-    return null;
-  }
-
-  const { role } = context;
+  const { user, loading } = useAuth()!;
 
   if (loading) {
     return (
@@ -30,6 +24,17 @@ function App() {
     return <LoginView />;
   }
 
+  // Also check if context or role is not yet determined
+  if (!context || context.role === null) {
+     return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  const { role } = context;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
@@ -42,10 +47,10 @@ function App() {
 
 export default function Home() {
   return (
-    <AppProvider>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AuthProvider>
   );
 }

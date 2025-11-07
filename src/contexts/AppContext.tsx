@@ -32,52 +32,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
-  const { user } = useAuth() || {}; // Use default empty object if useAuth returns null during SSR
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
+  const { user, authKey } = useAuth() || {}; // Use authKey to react to auth changes
 
-  const fetchTenants = useCallback(async () => {
+  const refreshTenants = useCallback(async () => {
     const tenantsFromDb = await getTenants();
     setTenants(tenantsFromDb);
   }, []);
   
-  const fetchProperties = useCallback(async () => {
+  const refreshProperties = useCallback(async () => {
     const propertiesFromDb = await getProperties();
     setProperties(propertiesFromDb);
   }, []);
 
   useEffect(() => {
-    const initializeUser = async (uid: string) => {
-      // Fetch user role first
-      const userRole = await getUserRole(uid);
-
-      if (userRole === 'tenant') {
-        setRole('tenant');
-        setCurrentTenantId(uid);
+    const initializeApp = async () => {
+      if (user) {
+        // Fetch base data
+        await Promise.all([refreshTenants(), refreshProperties()]);
+        
+        // Fetch and set role
+        const userRole = await getUserRole(user.uid);
+        if (userRole === 'tenant') {
+          setRole('tenant');
+          setCurrentTenantId(user.uid);
+        } else {
+          // Default to admin for users with 'admin' role or no specific role doc
+          setRole('admin');
+          setCurrentTenantId(null);
+        }
       } else {
-        // Default to 'admin' for any other case (explicit 'admin' role or no role doc found)
-        setRole('admin');
+        // Reset state on logout
+        setRole(null);
         setCurrentTenantId(null);
+        setTenants([]);
+        setProperties([]);
       }
-      
-      // Fetch tenants and properties for all users
-      fetchTenants();
-      fetchProperties();
     };
 
-    if (user) {
-      initializeUser(user.uid);
-    } else {
-      // Reset state on logout
-      setRole(null);
-      setCurrentTenantId(null);
-      setTenants([]);
-      setProperties([]);
-    }
-  }, [user, fetchTenants, fetchProperties]);
+    initializeApp();
+  }, [user, authKey, refreshTenants, refreshProperties]); // Depend on user and authKey
   
   const handleSetRole = (newRole: Role) => {
     // This function is primarily for the dev-mode role switcher.
-    // It should not override the actual user role logic on login.
     setRole(newRole);
     if (newRole === 'tenant') {
         // If the logged-in user is actually a tenant, use their ID
@@ -103,8 +100,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tenants, setTenants, 
         properties, setProperties,
         currentTenantId, 
-        refreshTenants: fetchTenants,
-        refreshProperties: fetchProperties
+        refreshTenants,
+        refreshProperties
     }}>
       {children}
     </AppContext.Provider>
