@@ -156,10 +156,17 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 }
             } else { // Adding
                 result = await createTenantAction(tenantData);
-                if (result.success) {
+                if (result.success && result.link) {
                     toast({ 
                         title: 'Tenant Created Successfully', 
-                        description: `Share this link with the tenant to set their password: ${result.link}`,
+                        description: (
+                            <div>
+                                <p>Share this link with the tenant to set their password:</p>
+                                <pre className="mt-2 rounded-md bg-slate-950 p-2 font-mono text-slate-50 text-sm break-all whitespace-pre-wrap">
+                                    {result.link}
+                                </pre>
+                            </div>
+                        ),
                         duration: 20000,
                     });
                 } else {
@@ -229,7 +236,14 @@ export default function TenantManagement() {
         if (result.success && result.link) {
             toast({ 
                 title: 'Password Link Generated', 
-                description: `Please copy and share this link with ${tenant.name}: ${result.link}`,
+                description: (
+                    <div>
+                        <p>Please copy and share this link with {tenant.name}:</p>
+                        <pre className="mt-2 rounded-md bg-slate-950 p-2 font-mono text-slate-50 text-sm break-all whitespace-pre-wrap">
+                            {result.link}
+                        </pre>
+                    </div>
+                ),
                 duration: 20000,
             });
         } else {
