@@ -3,7 +3,7 @@
 import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase-admin/firestore';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 
 
