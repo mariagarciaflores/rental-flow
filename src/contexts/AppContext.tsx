@@ -53,9 +53,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    // In a real app, you would fetch the user's role and tenant mapping
-    // from your database based on their auth UID (user.uid)
-    if (user) {
+    if (user && tenants.length > 0) {
         // Find the tenant that matches the logged-in user's auth UID
         const matchedTenant = tenants.find(t => t.authUid === user.uid);
 
@@ -63,13 +61,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setRole('tenant');
             setCurrentTenantId(matchedTenant.tenantId);
         } else {
-            // If no tenant record matches, assume admin.
-            // This is a simplification for the demo.
+            // This logic assumes non-tenants are admins.
+            // In a more complex app, you might have a dedicated 'roles' collection.
             setRole('admin');
             setCurrentTenantId(null);
         }
-    } else {
-        setRole('admin'); // Default role when not logged in
+    } else if (!user) {
+        // Not logged in, default to admin view for login screen context
+        setRole('admin'); 
         setCurrentTenantId(null);
     }
   }, [user, tenants]);

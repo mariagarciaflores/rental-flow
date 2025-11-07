@@ -1,4 +1,3 @@
-
 'use server';
 
 import { z } from 'zod';
@@ -61,9 +60,9 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 
         // 2. Add tenant data to Firestore
         const tenantsCol = adminDb.collection('tenants');
-        await tenantsCol.add({
+        await tenantsCol.doc(userRecord.uid).set({
             ...validatedData,
-            authUid: userRecord.uid, // Link to the auth user
+            authUid: userRecord.uid,
         });
 
         // 3. Generate password reset link (which is used for initial password setup)
@@ -101,17 +100,31 @@ export async function updateTenantAction(tenantId: string, tenantData: z.infer<t
 
 export async function deleteTenantAction(tenantId: string): Promise<{success: boolean; error?: string}> {
     try {
-        // Here you would also delete the corresponding Firebase Auth user
-        // const tenantDoc = await adminDb.collection("tenants").doc(tenantId).get();
-        // const tenantData = tenantDoc.data();
-        // if (tenantData?.authUid) {
-        //   await adminAuth.deleteUser(tenantData.authUid);
-        // }
         const tenantRef = adminDb.collection("tenants").doc(tenantId);
+        const tenantDoc = await tenantRef.get();
+        const tenantData = tenantDoc.data();
+        
+        // Delete auth user first
+        if (tenantData?.authUid) {
+          await adminAuth.deleteUser(tenantData.authUid);
+        }
+        
+        // Then delete firestore doc
         await tenantRef.delete();
         return { success: true };
     } catch (error: any) {
         console.error("Failed to delete tenant:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function generateAndCopyTenantPasswordLinkAction(email: string): Promise<{success: boolean; link?: string; error?: string;}> {
+    try {
+        const link = await adminAuth.generatePasswordResetLink(email);
+        return { success: true, link };
+    } catch (error: any) {
+        console.error("Failed to generate password reset link:", error);
         const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
         return { success: false, error: errorMessage };
     }

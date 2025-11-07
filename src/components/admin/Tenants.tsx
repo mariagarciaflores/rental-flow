@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useTransition } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,8 +36,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property } from '@/lib/types';
-import { createTenantAction, updateTenantAction, deleteTenantAction } from '@/app/actions';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
+import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -193,6 +193,8 @@ export default function TenantManagement() {
   const t = useTranslation();
   const context = useContext(AppContext);
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   useEffect(() => {
     context?.refreshTenants();
@@ -218,6 +220,20 @@ export default function TenantManagement() {
       console.error("Failed to delete tenant:", error);
       toast({ variant: 'destructive', title: 'Failed to delete tenant', description: (error as Error).message });
     }
+  };
+
+  const handleCopyLink = (tenant: Tenant) => {
+    setGeneratingFor(tenant.tenantId);
+    startTransition(async () => {
+        const result = await generateAndCopyTenantPasswordLinkAction(tenant.email);
+        if (result.success && result.link) {
+            await navigator.clipboard.writeText(result.link);
+            toast({ title: 'Link Copied!', description: `Password reset link for ${tenant.name} copied to clipboard.`});
+        } else {
+            toast({ variant: 'destructive', title: 'Failed to generate link', description: result.error });
+        }
+        setGeneratingFor(null);
+    });
   };
 
   return (
@@ -250,6 +266,10 @@ export default function TenantManagement() {
                 <TableCell>{tenant.email}</TableCell>
                 <TableCell>{tenant.phone}</TableCell>
                 <TableCell className="text-right space-x-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleCopyLink(tenant)} disabled={isPending && generatingFor === tenant.tenantId}>
+                        {isPending && generatingFor === tenant.tenantId ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4"/>}
+                        <span className="sr-only">Copy password link</span>
+                    </Button>
                     <TenantDialog tenant={tenant} properties={properties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
                     </TenantDialog>
