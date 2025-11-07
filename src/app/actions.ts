@@ -1,11 +1,10 @@
+
 'use server';
 
 import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
-import { addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase-admin/firestore';
-
 
 const VerifyReceiptActionInputSchema = z.object({
   invoiceId: z.string(),
@@ -90,8 +89,8 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 export async function updateTenantAction(tenantId: string, tenantData: z.infer<typeof TenantSchemaForEditing>): Promise<{success: boolean; error?: string}> {
     try {
         const validatedData = TenantSchemaForEditing.parse(tenantData);
-        const tenantRef = doc(adminDb, "tenants", tenantId);
-        await updateDoc(tenantRef, validatedData);
+        const tenantRef = adminDb.collection("tenants").doc(tenantId);
+        await tenantRef.update(validatedData);
         return { success: true };
     } catch (error: any) {
         console.error("Failed to update tenant:", error);
@@ -103,13 +102,13 @@ export async function updateTenantAction(tenantId: string, tenantData: z.infer<t
 export async function deleteTenantAction(tenantId: string): Promise<{success: boolean; error?: string}> {
     try {
         // Here you would also delete the corresponding Firebase Auth user
-        // const tenantDoc = await getDoc(doc(adminDb, "tenants", tenantId));
+        // const tenantDoc = await adminDb.collection("tenants").doc(tenantId).get();
         // const tenantData = tenantDoc.data();
         // if (tenantData?.authUid) {
         //   await adminAuth.deleteUser(tenantData.authUid);
         // }
-        const tenantRef = doc(adminDb, "tenants", tenantId);
-        await deleteDoc(tenantRef);
+        const tenantRef = adminDb.collection("tenants").doc(tenantId);
+        await tenantRef.delete();
         return { success: true };
     } catch (error: any) {
         console.error("Failed to delete tenant:", error);
@@ -127,8 +126,8 @@ export async function addPropertyAction(property: Omit<any, 'propertyId' | 'admi
 
 export async function updatePropertyAction(propertyId: string, propertyData: Partial<any>): Promise<{success: boolean; error?: string}> {
     try {
-        const propertyRef = doc(adminDb, "properties", propertyId);
-        await updateDoc(propertyRef, propertyData);
+        const propertyRef = adminDb.collection("properties").doc(propertyId);
+        await propertyRef.update(propertyData);
         return { success: true };
     } catch (error: any) {
         console.error("Failed to update property:", error);
@@ -139,8 +138,8 @@ export async function updatePropertyAction(propertyId: string, propertyData: Par
 
 export async function deletePropertyAction(propertyId: string): Promise<{success: boolean; error?: string}> {
     try {
-        const propertyRef = doc(adminDb, "properties", propertyId);
-        await deleteDoc(propertyRef);
+        const propertyRef = adminDb.collection("properties").doc(propertyId);
+        await propertyRef.delete();
         return { success: true };
     } catch (error: any) {
         console.error("Failed to delete property:", error);
