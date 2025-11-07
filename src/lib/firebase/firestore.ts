@@ -1,12 +1,6 @@
-'use server';
 import { collection, getDocs, addDoc, doc, updateDoc, getFirestore } from "firebase/firestore";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { firebaseConfig } from "./config";
+import { db } from "./client";
 import type { Tenant } from "@/lib/types";
-
-// Initialize Firebase for server-side if not already initialized
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 export async function getTenants(): Promise<Tenant[]> {
     const tenantsCol = collection(db, "tenants");
