@@ -50,6 +50,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (user) {
         // Fetch base data
         await Promise.all([refreshTenants(), refreshProperties()]);
+
+        console.log("User ", user)
         
         // Fetch and set role
         const userRole = await getUserRole(user.uid);

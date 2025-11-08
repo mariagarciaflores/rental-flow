@@ -8,19 +8,23 @@ service cloud.firestore {
       allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Tenants need to read properties to see their property name.
-    // Admins need to read all properties.
-    match /properties/{propertyId} {
+    // Tenants and Admins need to read properties.
+    match /properties/{document=**} {
         allow read: if request.auth != null;
-        // Only admins can create, update, or delete properties.
+    }
+
+    // Admins can write to properties.
+    match /properties/{propertyId} {
         allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Admins need to read all tenants.
-    // A tenant might need to read their own data (though this is less common on lists).
+    // Tenants and Admins need to read tenants.
+    match /tenants/{document=**} {
+       allow read: if request.auth != null;
+    }
+    
+    // Admins can write to tenants.
     match /tenants/{tenantId} {
-        allow read: if request.auth != null;
-         // Only admins can create, update, or delete tenants.
         allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
   }

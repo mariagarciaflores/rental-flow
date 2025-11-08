@@ -21,10 +21,12 @@ export async function getProperties(): Promise<Property[]> {
 
 // User Role Function
 export async function getUserRole(uid: string): Promise<'admin' | 'tenant' | null> {
+    console.log("uid", uid)
     if (!uid) return null;
     try {
         const userDocRef = doc(db, "users", uid);
         const userDocSnap = await getDoc(userDocRef);
+        console.log("User with UID ", userDocSnap);
 
         if (userDocSnap.exists()) {
             return userDocSnap.data().role;
