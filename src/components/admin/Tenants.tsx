@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext, useEffect, useTransition } from 'react';
+import { useState, useContext, useEffect, useTransition, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property, User } from '@/lib/types';
 import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
@@ -64,13 +65,15 @@ const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
 function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
   const initialData = isEditing && tenant ? {
-      name: tenant.user?.name || '',
-      email: tenant.user?.email || '',
-      phone: tenant.user?.phone || '',
+      // For editing, we don't change user details, only tenancy details
       propertyId: tenant.propertyId,
       fixedMonthlyRent: tenant.fixedMonthlyRent,
       paysUtilities: tenant.paysUtilities,
       startDate: tenant.startDate,
+      // User details for display, but can be part of the form state for editing tenancy-related user fields like phone
+      name: tenant.user?.name || '',
+      email: tenant.user?.email || '',
+      phone: tenant.user?.phone || '',
   } : emptyTenantData;
 
   const [formData, setFormData] = useState(initialData);
@@ -210,6 +213,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
 export default function TenantManagement() {
   const t = useTranslation();
   const context = useContext(AppContext);
+  const { user: authUser } = useAuth()!;
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
@@ -218,8 +222,12 @@ export default function TenantManagement() {
     context?.refreshData();
   }, []);
 
-  if (!context) return null;
+  if (!context || !authUser) return null;
   const { tenants, properties, refreshData } = context;
+
+  const userProperties = useMemo(() => {
+    return properties.filter(p => p.owners.includes(authUser.uid));
+  }, [properties, authUser.uid]);
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.id === propertyId)?.name || 'N/A';
@@ -267,7 +275,7 @@ export default function TenantManagement() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t('nav.tenants')}</CardTitle>
-        <TenantDialog properties={properties}>
+        <TenantDialog properties={userProperties}>
             <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 {t('action.add_tenant')}
@@ -299,7 +307,7 @@ export default function TenantManagement() {
                             <span className="sr-only">Generate password link</span>
                         </Button>
                     )}
-                    <TenantDialog tenant={tenancy} properties={properties}>
+                    <TenantDialog tenant={tenancy} properties={userProperties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
                     </TenantDialog>
                      <AlertDialog>
