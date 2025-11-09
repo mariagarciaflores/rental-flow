@@ -39,7 +39,7 @@ function AppContent() {
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        {role === 'admin' ? <AdminView /> : <TenantView />}
+        {role === 'owner' ? <AdminView /> : <TenantView />}
       </main>
     </div>
   );

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 import { verifyPaymentReceipt, VerifyPaymentReceiptInput } from '@/ai/flows/verify-payment-receipt';
+import type { User, Tenant, Property } from '@/lib/types';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const VerifyReceiptActionInputSchema = z.object({
   invoiceId: z.string(),
@@ -28,8 +30,6 @@ export async function verifyReceiptAction(formData: FormData) {
 
     const validatedInput = VerifyReceiptActionInputSchema.parse(rawInput);
     
-    // In a real app, you'd get this from a file upload and convert to data URI.
-    // Here we simulate it.
     const receiptDataUri = receiptDataUris[validatedInput.invoiceId] || receiptDataUris['inv2'];
 
     const verificationInput: VerifyPaymentReceiptInput = {
@@ -50,6 +50,7 @@ export async function verifyReceiptAction(formData: FormData) {
 export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>): Promise<{success: boolean, link?: string, error?: string}> {
     try {
         const validatedData = TenantSchemaForCreation.parse(tenantData);
+        const now = new Date().toISOString();
 
         // 1. Create user in Firebase Auth
         const userRecord = await adminAuth.createUser({
@@ -59,27 +60,38 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         });
         
         const batch = adminDb.batch();
+        const userId = userRecord.uid;
 
         // 2. Add user data to 'users' collection with role
-        const userRef = adminDb.collection('users').doc(userRecord.uid);
-        batch.set(userRef, {
-            uid: userRecord.uid,
+        const userRef = adminDb.collection('users').doc(userId);
+        const newUser: Omit<User, 'id'> = {
+            name: validatedData.name,
             email: validatedData.email,
-            displayName: validatedData.name,
-            role: 'tenant'
-        });
+            phone: validatedData.phone || '',
+            roles: ['tenant'],
+            createdAt: now,
+            updatedAt: now
+        };
+        batch.set(userRef, newUser);
 
-        // 3. Add tenant data to Firestore
-        const tenantRef = adminDb.collection('tenants').doc(userRecord.uid);
-        batch.set(tenantRef, {
-            ...validatedData,
-            authUid: userRecord.uid,
-            tenantId: userRecord.uid // Use auth UID as tenantId
-        });
+        // 3. Add tenancy data to 'tenants' collection
+        const tenantRef = adminDb.collection('tenants').doc(); // Auto-generate ID
+        const newTenant: Omit<Tenant, 'id'> = {
+            userId: userId,
+            propertyId: validatedData.propertyId,
+            fixedMonthlyRent: validatedData.fixedMonthlyRent,
+            paysUtilities: validatedData.paysUtilities,
+            startDate: validatedData.startDate,
+            endDate: null,
+            active: true,
+            createdAt: now,
+            updatedAt: now
+        };
+        batch.set(tenantRef, newTenant);
 
         await batch.commit();
 
-        // 4. Generate password reset link (which is used for initial password setup)
+        // 4. Generate password reset link for initial password setup
         const link = await adminAuth.generatePasswordResetLink(validatedData.email);
 
         return { success: true, link: link };
@@ -103,7 +115,13 @@ export async function updateTenantAction(tenantId: string, tenantData: z.infer<t
     try {
         const validatedData = TenantSchemaForEditing.parse(tenantData);
         const tenantRef = adminDb.collection("tenants").doc(tenantId);
-        await tenantRef.update(validatedData);
+        
+        const updatePayload = {
+            ...validatedData,
+            updatedAt: new Date().toISOString()
+        };
+        
+        await tenantRef.update(updatePayload);
         return { success: true };
     } catch (error: any) {
         console.error("Failed to update tenant:", error);
@@ -112,21 +130,22 @@ export async function updateTenantAction(tenantId: string, tenantData: z.infer<t
     }
 }
 
-export async function deleteTenantAction(tenantId: string): Promise<{success: boolean; error?: string}> {
+export async function deleteTenantAction(userId: string, tenantId: string): Promise<{success: boolean; error?: string}> {
     try {
-        // In a real app, you might want to handle this in a transaction
-        
-        // Delete auth user first
-        await adminAuth.deleteUser(tenantId);
-        
-        // Then delete firestore docs
-        const tenantRef = adminDb.collection("tenants").doc(tenantId);
-        const userRef = adminDb.collection("users").doc(tenantId);
-
         const batch = adminDb.batch();
+        
+        // Delete auth user
+        await adminAuth.deleteUser(userId);
+        
+        // Delete firestore docs
+        const tenantRef = adminDb.collection("tenants").doc(tenantId);
+        const userRef = adminDb.collection("users").doc(userId);
+
         batch.delete(tenantRef);
         batch.delete(userRef);
         
+        // Optional: Also delete associated invoices? For now, we leave them.
+
         await batch.commit();
 
         return { success: true };
@@ -136,6 +155,7 @@ export async function deleteTenantAction(tenantId: string): Promise<{success: bo
         return { success: false, error: errorMessage };
     }
 }
+
 
 export async function generateAndCopyTenantPasswordLinkAction(email: string): Promise<{success: boolean; link?: string; error?: string;}> {
     try {
@@ -148,17 +168,25 @@ export async function generateAndCopyTenantPasswordLinkAction(email: string): Pr
     }
 }
 
-export async function addPropertyAction(property: Omit<any, 'propertyId' | 'adminId'>, adminId: string): Promise<any> {
-    const newProperty = { ...property, adminId }; 
-    const propertiesCol = adminDb.collection("properties");
-    const docRef = await propertiesCol.add(newProperty);
-    return { propertyId: docRef.id, ...newProperty };
+export async function addPropertyAction(property: Omit<Property, 'id' | 'createdAt' | 'updatedAt'>, ownerId: string): Promise<{ id: string } & Omit<Property, 'id'>> {
+    const now = new Date().toISOString();
+    const newPropertyData = {
+        ...property,
+        owners: [ownerId],
+        createdAt: now,
+        updatedAt: now,
+    };
+    const docRef = await adminDb.collection("properties").add(newPropertyData);
+    return { id: docRef.id, ...newPropertyData };
 }
 
-export async function updatePropertyAction(propertyId: string, propertyData: Partial<any>): Promise<{success: boolean; error?: string}> {
+export async function updatePropertyAction(propertyId: string, propertyData: Partial<Property>): Promise<{success: boolean; error?: string}> {
     try {
         const propertyRef = adminDb.collection("properties").doc(propertyId);
-        await propertyRef.update(propertyData);
+        await propertyRef.update({
+            ...propertyData,
+            updatedAt: new Date().toISOString()
+        });
         return { success: true };
     } catch (error: any) {
         console.error("Failed to update property:", error);

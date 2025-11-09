@@ -19,8 +19,10 @@ import { useTranslation, TranslationKey } from '@/lib/i18n';
 import { AppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { verifyReceiptAction } from '@/app/actions';
-import type { Invoice } from '@/lib/types';
+import type { Invoice, InvoiceStatus } from '@/lib/types';
 import type { VerifyPaymentReceiptOutput } from '@/ai/flows/verify-payment-receipt';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 
 export default function PaymentVerificationDialog({ invoice }: { invoice: Invoice }) {
   const t = useTranslation();
@@ -32,9 +34,11 @@ export default function PaymentVerificationDialog({ invoice }: { invoice: Invoic
   const [error, setError] = useState<string | null>(null);
 
   if (!context) return null;
-  const { tenants, setInvoices } = context;
+  const { tenants, properties, refreshData } = context;
 
-  const tenant = tenants.find(t => t.tenantId === invoice.tenantId);
+  const tenancy = tenants.find(t => t.id === invoice.tenantId);
+  const tenantUser = tenancy?.user;
+  const property = properties.find(p => p.id === invoice.propertyId);
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
@@ -43,10 +47,10 @@ export default function PaymentVerificationDialog({ invoice }: { invoice: Invoic
     setVerificationResult(null);
     startTransition(async () => {
       const formData = new FormData();
-      formData.append('invoiceId', invoice.invoiceId);
+      formData.append('invoiceId', invoice.id);
       formData.append('expectedAmount', invoice.totalDue.toString());
-      formData.append('tenantName', tenant?.name || 'N/A');
-      formData.append('propertyName', 'Property Name'); // This should be looked up
+      formData.append('tenantName', tenantUser?.name || 'N/A');
+      formData.append('propertyName', property?.name || 'N/A');
       
       const result = await verifyReceiptAction(formData);
 
@@ -58,24 +62,39 @@ export default function PaymentVerificationDialog({ invoice }: { invoice: Invoic
     });
   };
 
-  const handleStatusUpdate = (status: 'PAID' | 'PENDING') => {
-    setInvoices(prev => prev.map(inv => {
-      if (inv.invoiceId === invoice.invoiceId) {
-        return {
-            ...inv,
-            status,
-            // If rejected, clear proof details
-            paymentProofUrl: status === 'PENDING' ? null : inv.paymentProofUrl,
-            submittedPaymentAmount: status === 'PENDING' ? null : inv.submittedPaymentAmount,
-            submissionDate: status === 'PENDING' ? null : inv.submissionDate,
+  const handleStatusUpdate = async (status: 'paid' | 'pending') => {
+    const invoiceRef = doc(db, 'invoices', invoice.id);
+    try {
+        const updatePayload: any = {
+            status: status,
+            updatedAt: new Date().toISOString(),
         };
-      }
-      return inv;
-    }));
-    toast({
-      title: status === 'PAID' ? t('verification.success') : t('verification.rejected'),
-    });
-    setOpen(false);
+
+        if (status === 'paid') {
+            updatePayload.paymentDate = new Date().toISOString();
+        } else { // If rejecting payment
+            updatePayload.paymentProofUrl = null;
+            updatePayload.submittedPaymentAmount = null;
+            updatePayload.submissionDate = null;
+        }
+
+        await updateDoc(invoiceRef, updatePayload);
+        
+        await refreshData(); // Refresh all data
+        
+        toast({
+          title: status === 'paid' ? t('verification.success') : t('verification.rejected'),
+        });
+        setOpen(false);
+
+    } catch (e) {
+        console.error("Failed to update invoice status:", e);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to update invoice status."
+        });
+    }
   };
   
   return (
@@ -94,7 +113,7 @@ export default function PaymentVerificationDialog({ invoice }: { invoice: Invoic
                 <CardTitle>{t('verification.details')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
-                <p><strong>{t('table.header.tenant')}:</strong> {tenant?.name}</p>
+                <p><strong>{t('table.header.tenant')}:</strong> {tenantUser?.name}</p>
                 <p><strong>{t('form.month')}:</strong> {invoice.month}</p>
                 <p><strong>{t('table.header.total_due')}:</strong> {formatCurrency(invoice.totalDue)}</p>
                 <p><strong>{t('verification.submitted_amount')}:</strong> {formatCurrency(invoice.submittedPaymentAmount || 0)}</p>
@@ -134,8 +153,8 @@ export default function PaymentVerificationDialog({ invoice }: { invoice: Invoic
           </div>
         </div>
         <DialogFooter className="mt-6">
-            <Button variant="destructive" onClick={() => handleStatusUpdate('PENDING')}>{t('action.reject_payment')}</Button>
-            <Button variant="default" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('PAID')}>{t('action.mark_paid')}</Button>
+            <Button variant="destructive" onClick={() => handleStatusUpdate('pending')}>{t('action.reject_payment')}</Button>
+            <Button variant="default" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('paid')}>{t('action.mark_paid')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

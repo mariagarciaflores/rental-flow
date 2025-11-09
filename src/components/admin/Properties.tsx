@@ -41,14 +41,14 @@ import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
-const emptyProperty: Omit<Property, 'propertyId' | 'adminId'> = {
+const emptyProperty: Omit<Property, 'id' | 'owners' | 'createdAt' | 'updatedAt'> = {
   name: '',
   address: '',
 };
 
-function PropertyForm({ property, onSave }: { property: Partial<Property>, onSave: (property: Omit<Property, 'propertyId' | 'adminId'>) => void }) {
+function PropertyForm({ property, onSave }: { property: Partial<Property>, onSave: (property: Omit<Property, 'id' | 'owners' | 'createdAt' | 'updatedAt'>) => void }) {
   const t = useTranslation();
-  const [formData, setFormData] = useState<Omit<Property, 'propertyId' | 'adminId'>>(
+  const [formData, setFormData] = useState<Omit<Property, 'id' | 'owners' | 'createdAt' | 'updatedAt'>>(
     {...emptyProperty, ...property}
   );
 
@@ -81,18 +81,17 @@ function PropertyDialog({ property, children }: { property?: Property, children:
     const { toast } = useToast();
     
     if (!context) return null;
-    const { refreshProperties } = context;
+    const { refreshData } = context;
 
-    const handleSave = async (formData: Omit<Property, 'propertyId' | 'adminId'>) => {
+    const handleSave = async (formData: Omit<Property, 'id' | 'owners' | 'createdAt' | 'updatedAt'>) => {
         if (!user) {
             toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to save a property.' });
             return;
         }
 
         try {
-            let result;
-            if (property?.propertyId) { // Editing
-                result = await updatePropertyAction(property.propertyId, formData);
+            if (property?.id) { // Editing
+                const result = await updatePropertyAction(property.id, formData);
                  if (result.success) {
                     toast({ title: 'Property Updated' });
                 } else {
@@ -102,7 +101,7 @@ function PropertyDialog({ property, children }: { property?: Property, children:
                 await addPropertyAction(formData, user.uid);
                 toast({ title: 'Property Added' });
             }
-            await refreshProperties();
+            await refreshData();
             setOpen(false);
         } catch (error) {
             console.error("Failed to save property:", error);
@@ -131,17 +130,17 @@ export default function PropertyList() {
   const { toast } = useToast();
 
   if (!context) return null;
-  const { properties, refreshProperties } = context;
+  const { properties, refreshData } = context;
 
   useEffect(() => {
-    refreshProperties();
+    refreshData();
   }, []);
 
   const handleDelete = async (propertyId: string) => {
     try {
       const result = await deletePropertyAction(propertyId);
       if (result.success) {
-        await refreshProperties();
+        await refreshData();
         toast({ title: 'Property Deleted' });
       } else {
         throw new Error(result.error);
@@ -174,7 +173,7 @@ export default function PropertyList() {
           </TableHeader>
           <TableBody>
             {properties.map((property) => (
-              <TableRow key={property.propertyId}>
+              <TableRow key={property.id}>
                 <TableCell className="font-medium">{property.name}</TableCell>
                 <TableCell>{property.address}</TableCell>
                 <TableCell className="text-right space-x-2">
@@ -194,7 +193,7 @@ export default function PropertyList() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(property.propertyId)}>Continue</AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(property.id)}>Continue</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>

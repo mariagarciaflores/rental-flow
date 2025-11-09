@@ -1,7 +1,6 @@
 'use client';
 import { useContext, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
 import { expenses as expenseData } from '@/lib/data';
@@ -13,16 +12,16 @@ export default function AdminDashboard() {
   const context = useContext(AppContext);
   if (!context) return null;
 
-  const { invoices } = context;
+  const { invoices, tenants } = context;
 
   const unverifiedPayments = invoices.filter(
-    (invoice) => invoice.status === 'PENDING' && invoice.paymentProofUrl
+    (invoice) => invoice.status === 'pending' && invoice.paymentProofUrl
   );
 
   const { totalIncome, totalOutstanding } = useMemo(() => {
     return invoices.reduce(
       (acc, invoice) => {
-        if (invoice.status === 'PAID') {
+        if (invoice.status === 'paid') {
           acc.totalIncome += invoice.totalDue;
         } else {
           acc.totalOutstanding += invoice.totalDue - (invoice.submittedPaymentAmount || 0);
@@ -88,17 +87,20 @@ export default function AdminDashboard() {
         <CardContent>
           {unverifiedPayments.length > 0 ? (
             <ul className="space-y-4">
-              {unverifiedPayments.map((invoice) => (
-                <li key={invoice.invoiceId} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{context.tenants.find(t => t.tenantId === invoice.tenantId)?.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('form.month')}: {invoice.month} - {formatCurrency(invoice.submittedPaymentAmount || 0)}
-                    </p>
-                  </div>
-                  <PaymentVerificationDialog invoice={invoice} />
-                </li>
-              ))}
+              {unverifiedPayments.map((invoice) => {
+                const tenancy = tenants.find(t => t.id === invoice.tenantId);
+                return (
+                  <li key={invoice.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{tenancy?.user?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('form.month')}: {invoice.month} - {formatCurrency(invoice.submittedPaymentAmount || 0)}
+                      </p>
+                    </div>
+                    <PaymentVerificationDialog invoice={invoice} />
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">No unverified payments.</p>

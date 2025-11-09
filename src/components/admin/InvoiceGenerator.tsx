@@ -23,6 +23,24 @@ import { AppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { FilePlus2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { adminDb } from '@/lib/firebase/admin';
+import { collection, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
+import type { Invoice } from '@/lib/types';
+
+
+async function generateInvoicesInFirestore(invoices: Omit<Invoice, 'id'>[]) {
+    const batch = writeBatch(db);
+    const invoicesCol = collection(db, "invoices");
+
+    invoices.forEach(invoiceData => {
+        const newInvoiceRef = doc(invoicesCol);
+        batch.set(newInvoiceRef, invoiceData);
+    });
+
+    await batch.commit();
+}
+
 
 export function InvoiceGenerator() {
   const t = useTranslation();
@@ -37,38 +55,66 @@ export function InvoiceGenerator() {
   );
 
   if (!context) return null;
-  const { tenants, invoices, setInvoices } = context;
+  const { tenants, invoices, refreshData } = context;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const monthYear = `${selectedYear}-${selectedMonth}`;
-    
-    const newInvoices = tenants.map(tenant => {
-       // Simple check to prevent duplicate invoice generation
-       const alreadyExists = invoices.some(inv => inv.tenantId === tenant.tenantId && inv.month === monthYear);
+    const now = new Date().toISOString();
+
+    const newInvoicesData = tenants.filter(t => t.active).map(tenancy => {
+       const alreadyExists = invoices.some(inv => inv.tenantId === tenancy.id && inv.month === monthYear);
        if (alreadyExists) return null;
 
        return {
-            invoiceId: `inv-${tenant.tenantId}-${monthYear}-${Math.random()}`,
-            tenantId: tenant.tenantId,
+            tenantId: tenancy.id,
+            userId: tenancy.userId,
+            propertyId: tenancy.propertyId,
             month: monthYear,
-            fixedRentAmount: tenant.fixedMonthlyRent,
-            utilityFees: 0, // Admin can edit this later
-            totalDue: tenant.fixedMonthlyRent,
-            status: 'PENDING' as const,
-            paymentProofUrl: null,
-            submittedPaymentAmount: null,
-            submissionDate: null,
+            rentAmount: tenancy.fixedMonthlyRent,
+            utilitiesAmount: 0, // Admin can edit this later
+            totalDue: tenancy.fixedMonthlyRent,
+            status: 'pending' as const,
+            paymentDate: null,
+            createdAt: now,
+            updatedAt: now,
        };
-    }).filter(Boolean);
+    }).filter(Boolean) as Omit<Invoice, 'id'>[];
 
-    // @ts-ignore
-    setInvoices(prev => [...prev, ...newInvoices]);
-    
-    toast({
-      title: `${t('invoice_generator.success')} ${monthYear}`,
-      description: `${newInvoices.length} new invoices were created.`,
-    });
-    setOpen(false);
+    if (newInvoicesData.length === 0) {
+        toast({
+            title: "No Invoices to Generate",
+            description: `All active tenants already have an invoice for ${monthYear}.`,
+        });
+        setOpen(false);
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        const invoicesCol = collection(db, "invoices");
+
+        newInvoicesData.forEach(invoiceData => {
+            const newInvoiceRef = doc(invoicesCol);
+            batch.set(newInvoiceRef, invoiceData);
+        });
+
+        await batch.commit();
+        
+        await refreshData();
+        
+        toast({
+          title: `${t('invoice_generator.success')} ${monthYear}`,
+          description: `${newInvoicesData.length} new invoices were created.`,
+        });
+        setOpen(false);
+    } catch (error) {
+        console.error("Error generating invoices: ", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to generate invoices. Please try again."
+        });
+    }
   };
 
   const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - i).toString());

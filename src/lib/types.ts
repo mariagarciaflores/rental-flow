@@ -1,35 +1,54 @@
-export interface Property {
-  propertyId: string;
-  name: string;
-  address: string;
-  adminId: string;
-}
-
-export interface Tenant {
-  tenantId: string;
+export interface User {
+  id: string; // Same as Firebase Auth UID
   name: string;
   email: string;
   phone?: string;
+  roles: ('owner' | 'tenant')[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Property {
+  id: string;
+  name: string;
+  address: string;
+  owners: string[]; // Array of user IDs
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Represents a tenancy or lease agreement
+export interface Tenant {
+  id: string;
+  userId: string;
   propertyId: string;
   fixedMonthlyRent: number;
   paysUtilities: boolean;
-  authUid: string; // Link to Firebase Auth user
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export type InvoiceStatus = 'PENDING' | 'PARTIAL' | 'PAID';
+export type InvoiceStatus = 'pending' | 'paid' | 'partial';
 
 export interface Invoice {
-  invoiceId: string;
-  tenantId: string;
-
+  id: string;
+  tenantId: string; // Link to the tenancy document
+  userId: string; // The user who is the tenant
+  propertyId: string;
   month: string; // YYYY-MM
-  fixedRentAmount: number;
-  utilityFees: number;
+  rentAmount: number;
+  utilitiesAmount: number;
   totalDue: number;
   status: InvoiceStatus;
-  paymentProofUrl: string | null;
-  submittedPaymentAmount: number | null;
-  submissionDate: string | null; // ISO 8601 date string
+  paymentDate: string | null;
+  paymentProofUrl?: string | null;
+  submittedPaymentAmount?: number | null;
+  submissionDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ExpenseType = 'FIXED_SERVICE' | 'MAINTENANCE_OTHER';

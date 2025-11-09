@@ -30,16 +30,17 @@ export default function TenantDashboard() {
   const context = useContext(AppContext);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
-  const { invoices, currentTenantId } = context!;
+  if (!context) return null;
+  const { invoices, currentUser } = context;
 
   const tenantInvoices = useMemo(() => {
-    if (!currentTenantId) return [];
-    return invoices.filter(inv => inv.tenantId === currentTenantId);
-  }, [invoices, currentTenantId]);
+    if (!currentUser) return [];
+    return invoices.filter(inv => inv.userId === currentUser.id);
+  }, [invoices, currentUser]);
 
   const outstandingDebt = useMemo(() => {
     return tenantInvoices
-      .filter(inv => inv.status !== 'PAID')
+      .filter(inv => inv.status !== 'paid')
       .reduce((acc, inv) => acc + (inv.totalDue - (inv.submittedPaymentAmount || 0)), 0);
   }, [tenantInvoices]);
 
@@ -56,11 +57,11 @@ export default function TenantDashboard() {
 
   const getStatusVariant = (status: InvoiceStatus): 'default' | 'secondary' | 'destructive' => {
     switch (status) {
-      case 'PAID':
+      case 'paid':
         return 'default';
-      case 'PENDING':
+      case 'pending':
         return 'destructive';
-      case 'PARTIAL':
+      case 'partial':
         return 'secondary';
       default:
         return 'default';
@@ -71,7 +72,7 @@ export default function TenantDashboard() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
-  if (!currentTenantId) {
+  if (!currentUser || !context.currentTenantId) {
     return (
         <Alert variant="destructive">
             <Info className="h-4 w-4" />
@@ -131,7 +132,7 @@ export default function TenantDashboard() {
             <TableBody>
               {filteredInvoices.length > 0 ? (
                 filteredInvoices.map((invoice: Invoice) => (
-                  <TableRow key={invoice.invoiceId}>
+                  <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.month}</TableCell>
                     <TableCell className="text-right">{formatCurrency(invoice.totalDue)}</TableCell>
                     <TableCell className="text-center">

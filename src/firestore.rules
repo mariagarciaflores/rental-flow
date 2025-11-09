@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read their own user document to get their roles.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Only owners can create/update user roles.
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']);
+    }
+
+    // Authenticated users can read properties.
+    match /properties/{propertyId} {
+        allow read: if request.auth != null;
+        // Only owners can write to properties.
+        allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']);
+    }
+
+    // Authenticated users can read tenancy records.
+    match /tenants/{tenantId} {
+       allow read: if request.auth != null;
+       // Only owners can write to tenancy records.
+       allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']);
+    }
+
+    // Invoices rules
+    match /invoices/{invoiceId} {
+      // An owner can read any invoice. A tenant can only read their own invoices.
+      allow read: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']) || resource.data.userId == request.auth.uid);
+      
+      // An owner can create/update any invoice. A tenant can update their own invoice (e.g., submit payment).
+      allow write: if request.auth != null &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']) || resource.data.userId == request.auth.uid);
+    }
+  }
+}

@@ -19,11 +19,11 @@ export default function InvoiceManagement() {
 
   const getStatusVariant = (status: InvoiceStatus): 'default' | 'secondary' | 'destructive' => {
     switch (status) {
-      case 'PAID':
+      case 'paid':
         return 'default';
-      case 'PENDING':
+      case 'pending':
         return 'destructive';
-      case 'PARTIAL':
+      case 'partial':
         return 'secondary';
       default:
         return 'default';
@@ -31,7 +31,8 @@ export default function InvoiceManagement() {
   };
 
   const getTenantName = (tenantId: string) => {
-    return tenants.find(t => t.tenantId === tenantId)?.name || 'Unknown Tenant';
+    const tenancy = tenants.find(t => t.id === tenantId);
+    return tenancy?.user?.name || 'Unknown Tenant';
   };
 
   const formatCurrency = (amount: number) => {
@@ -58,7 +59,7 @@ export default function InvoiceManagement() {
           </TableHeader>
           <TableBody>
             {sortedInvoices.map((invoice) => (
-              <TableRow key={invoice.invoiceId}>
+              <TableRow key={invoice.id}>
                 <TableCell className="font-medium">{invoice.month}</TableCell>
                 <TableCell>{getTenantName(invoice.tenantId)}</TableCell>
                 <TableCell className="text-right">{formatCurrency(invoice.totalDue)}</TableCell>

@@ -35,7 +35,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppContext } from '@/contexts/AppContext';
 import { useTranslation } from '@/lib/i18n';
-import type { Tenant, Property } from '@/lib/types';
+import type { Tenant, Property, User } from '@/lib/types';
 import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
 import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
 import {
@@ -50,21 +50,30 @@ import { z } from 'zod';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 
 
-const emptyTenant: z.infer<typeof TenantSchemaForCreation> = {
+const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
   name: '',
   email: '',
   phone: '',
   propertyId: '',
   fixedMonthlyRent: 0,
   paysUtilities: false,
+  startDate: new Date().toISOString().split('T')[0], // Default to today
 };
 
 
-function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial<Tenant>, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
+function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
-  const [formData, setFormData] = useState(
-    {...emptyTenant, ...tenant}
-  );
+  const initialData = isEditing && tenant ? {
+      name: tenant.user?.name || '',
+      email: tenant.user?.email || '',
+      phone: tenant.user?.phone || '',
+      propertyId: tenant.propertyId,
+      fixedMonthlyRent: tenant.fixedMonthlyRent,
+      paysUtilities: tenant.paysUtilities,
+      startDate: tenant.startDate,
+  } : emptyTenantData;
+
+  const [formData, setFormData] = useState(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
@@ -88,7 +97,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">{t('form.name')}</Label>
             <div className="col-span-3">
-                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} disabled={isEditing} />
                 {errors.name && <p className="text-destructive text-sm mt-1">{errors.name}</p>}
             </div>
         </div>
@@ -111,7 +120,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial
                         <SelectValue placeholder="Select a property" />
                     </SelectTrigger>
                     <SelectContent>
-                        {properties.map(p => <SelectItem key={p.propertyId} value={p.propertyId}>{p.name}</SelectItem>)}
+                        {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
                 {errors.propertyId && <p className="text-destructive text-sm mt-1">{errors.propertyId}</p>}
@@ -125,6 +134,10 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="startDate" className="text-right">Start Date</Label>
+            <Input id="startDate" type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
              <Label htmlFor="paysUtilities" className="text-right">{t('form.pays_utilities')}</Label>
             <Checkbox id="paysUtilities" checked={formData.paysUtilities} onCheckedChange={checked => setFormData({...formData, paysUtilities: !!checked})} />
         </div>
@@ -135,27 +148,27 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant: Partial
   )
 }
 
-function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, properties: Property[], children: React.ReactNode}) {
+function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { user?: User }, properties: Property[], children: React.ReactNode}) {
     const t = useTranslation();
     const context = useContext(AppContext);
     const [open, setOpen] = useState(false);
     const { toast } = useToast();
     
     if (!context) return null;
-    const { refreshTenants } = context;
+    const { refreshData } = context;
 
-    const handleSave = async (tenantData: any) => {
+    const handleSave = async (data: any) => {
         try {
             let result;
-            if (tenant?.tenantId) { // Editing
-                result = await updateTenantAction(tenant.tenantId, tenantData);
+            if (tenant?.id) { // Editing
+                result = await updateTenantAction(tenant.id, data);
                  if (result.success) {
                     toast({ title: 'Tenant Updated' });
                 } else {
                     throw new Error(result.error);
                 }
             } else { // Adding
-                result = await createTenantAction(tenantData);
+                result = await createTenantAction(data);
                 if (result.success && result.link) {
                     toast({ 
                         title: 'Tenant Created Successfully', 
@@ -171,7 +184,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                     throw new Error(result.error);
                 }
             }
-            await refreshTenants();
+            await refreshData();
             setOpen(false);
         } catch (error) {
             console.error("Failed to save tenant:", error);
@@ -188,7 +201,7 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant, prope
                 <DialogHeader>
                     <DialogTitle>{tenant ? t('action.edit_tenant') : t('action.add_tenant')}</DialogTitle>
                 </DialogHeader>
-                <TenantForm tenant={tenant || {}} properties={properties} onSave={handleSave} isEditing={!!tenant} />
+                <TenantForm tenant={tenant} properties={properties} onSave={handleSave} isEditing={!!tenant} />
             </DialogContent>
         </Dialog>
     )
@@ -202,21 +215,21 @@ export default function TenantManagement() {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   useEffect(() => {
-    context?.refreshTenants();
+    context?.refreshData();
   }, []);
 
   if (!context) return null;
-  const { tenants, properties, refreshTenants } = context;
+  const { tenants, properties, refreshData } = context;
 
   const getPropertyName = (propertyId: string) => {
-    return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';
+    return properties.find(p => p.id === propertyId)?.name || 'N/A';
   }
   
-  const handleDelete = async (tenantId: string) => {
+  const handleDelete = async (userId: string, tenantId: string) => {
     try {
-      const result = await deleteTenantAction(tenantId);
+      const result = await deleteTenantAction(userId, tenantId);
       if (result.success) {
-        await refreshTenants();
+        await refreshData();
         toast({ title: 'Tenant Deleted' });
       } else {
         throw new Error(result.error);
@@ -227,16 +240,17 @@ export default function TenantManagement() {
     }
   };
 
-  const handleGenerateLink = (tenant: Tenant) => {
-    setGeneratingFor(tenant.tenantId);
+  const handleGenerateLink = (tenantUser: User) => {
+    if (!tenantUser) return;
+    setGeneratingFor(tenantUser.id);
     startTransition(async () => {
-        const result = await generateAndCopyTenantPasswordLinkAction(tenant.email);
+        const result = await generateAndCopyTenantPasswordLinkAction(tenantUser.email);
         if (result.success && result.link) {
             toast({ 
                 title: 'Password Link Generated', 
                 description: (
                     <div className="space-y-2">
-                        <p>Please copy and share this link with {tenant.name}:</p>
+                        <p>Please copy and share this link with {tenantUser.name}:</p>
                         <Input type="text" readOnly value={result.link} className="bg-muted"/>
                     </div>
                 ),
@@ -272,18 +286,20 @@ export default function TenantManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tenants.map((tenant) => (
-              <TableRow key={tenant.tenantId}>
-                <TableCell className="font-medium">{tenant.name}</TableCell>
-                <TableCell>{getPropertyName(tenant.propertyId)}</TableCell>
-                <TableCell>{tenant.email}</TableCell>
-                <TableCell>{tenant.phone}</TableCell>
+            {tenants.map((tenancy) => (
+              <TableRow key={tenancy.id}>
+                <TableCell className="font-medium">{tenancy.user?.name}</TableCell>
+                <TableCell>{getPropertyName(tenancy.propertyId)}</TableCell>
+                <TableCell>{tenancy.user?.email}</TableCell>
+                <TableCell>{tenancy.user?.phone}</TableCell>
                 <TableCell className="text-right space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(tenant)} disabled={isPending && generatingFor === tenant.tenantId}>
-                        {isPending && generatingFor === tenant.tenantId ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4"/>}
-                        <span className="sr-only">Generate password link</span>
-                    </Button>
-                    <TenantDialog tenant={tenant} properties={properties}>
+                    {tenancy.user && (
+                        <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(tenancy.user!)} disabled={isPending && generatingFor === tenancy.user.id}>
+                            {isPending && generatingFor === tenancy.user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4"/>}
+                            <span className="sr-only">Generate password link</span>
+                        </Button>
+                    )}
+                    <TenantDialog tenant={tenancy} properties={properties}>
                          <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
                     </TenantDialog>
                      <AlertDialog>
@@ -299,7 +315,7 @@ export default function TenantManagement() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(tenant.tenantId)}>Continue</AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(tenancy.userId, tenancy.id)}>Continue</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>

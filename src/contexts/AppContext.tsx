@@ -1,12 +1,11 @@
 'use client';
 import { createContext, useState, ReactNode, Dispatch, SetStateAction, useEffect, useCallback } from 'react';
-import type { Invoice, Tenant, Property } from '@/lib/types';
-import { invoices as initialInvoices } from '@/lib/data';
+import type { Invoice, Tenant, Property, User } from '@/lib/types';
 import { useAuth } from './AuthContext';
-import { getTenants, getProperties, getUserRole } from '@/lib/firebase/firestore';
+import { getTenants, getProperties, getUser, getInvoices } from '@/lib/firebase/firestore';
 
 export type Language = 'en' | 'es';
-export type Role = 'admin' | 'tenant';
+export type Role = 'owner' | 'tenant';
 
 interface AppContextType {
   language: Language;
@@ -15,13 +14,13 @@ interface AppContextType {
   setRole: (role: Role) => void;
   invoices: Invoice[];
   setInvoices: Dispatch<SetStateAction<Invoice[]>>;
-  tenants: Tenant[];
-  setTenants: Dispatch<SetStateAction<Tenant[]>>;
+  tenants: (Tenant & { user?: User })[]; // Tenant contract with user details
+  setTenants: Dispatch<SetStateAction<(Tenant & { user?: User })[]>>;
   properties: Property[];
   setProperties: Dispatch<SetStateAction<Property[]>>;
-  currentTenantId: string | null;
-  refreshTenants: () => Promise<void>;
-  refreshProperties: () => Promise<void>;
+  currentTenantId: string | null; // This now refers to the TENANCY ID from the 'tenants' collection
+  currentUser: User | null;
+  refreshData: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -29,67 +28,86 @@ export const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
   const [role, setRole] = useState<Role | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [tenants, setTenants] = useState<(Tenant & { user?: User })[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
-  const { user, authKey } = useAuth() || {}; // Use authKey to react to auth changes
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { user: authUser, authKey } = useAuth() || {};
 
-  const refreshTenants = useCallback(async () => {
-    const tenantsFromDb = await getTenants();
-    setTenants(tenantsFromDb);
-  }, []);
-  
-  const refreshProperties = useCallback(async () => {
-    const propertiesFromDb = await getProperties();
-    setProperties(propertiesFromDb);
-  }, []);
+  const refreshData = useCallback(async () => {
+    if (!authUser) return;
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      if (user) {
-        // Fetch base data
-        await Promise.all([refreshTenants(), refreshProperties()]);
+    try {
+        const [tenantsFromDb, propertiesFromDb, invoicesFromDb, userFromDb] = await Promise.all([
+            getTenants(),
+            getProperties(),
+            getInvoices(),
+            getUser(authUser.uid),
+        ]);
 
-        console.log("User ", user)
-        
-        // Fetch and set role
-        const userRole = await getUserRole(user.uid);
-        if (userRole === 'tenant') {
-          setRole('tenant');
-          setCurrentTenantId(user.uid);
+        if (userFromDb) {
+            setCurrentUser(userFromDb);
+            const primaryRole = userFromDb.roles.includes('owner') ? 'owner' : userFromDb.roles[0];
+            setRole(primaryRole);
+
+            if (primaryRole === 'tenant') {
+                const userTenancy = tenantsFromDb.find(t => t.userId === authUser.uid);
+                setCurrentTenantId(userTenancy ? userTenancy.id : null);
+            } else {
+                setCurrentTenantId(null);
+            }
         } else {
-          // Default to admin for users with 'admin' role or no specific role doc
-          setRole('admin');
-          setCurrentTenantId(null);
+            // Default to owner if no user doc, for dev purposes
+            setRole('owner');
         }
-      } else {
-        // Reset state on logout
+
+        const usersForTenants = await Promise.all(
+            tenantsFromDb.map(t => getUser(t.userId))
+        );
+
+        const tenantsWithUsers = tenantsFromDb.map((tenant, index) => ({
+            ...tenant,
+            user: usersForTenants[index] || undefined
+        }));
+
+        setTenants(tenantsWithUsers);
+        setProperties(propertiesFromDb);
+        setInvoices(invoicesFromDb);
+
+    } catch (error) {
+        console.error("Error initializing app data:", error);
+        // Reset state on error
         setRole(null);
+        setCurrentUser(null);
         setCurrentTenantId(null);
         setTenants([]);
         setProperties([]);
-      }
-    };
+        setInvoices([]);
+    }
+  }, [authUser]);
 
-    initializeApp();
-  }, [user, authKey, refreshTenants, refreshProperties]); // Depend on user and authKey
+  useEffect(() => {
+    if (authUser) {
+      refreshData();
+    } else {
+      // Reset state on logout
+      setRole(null);
+      setCurrentUser(null);
+      setCurrentTenantId(null);
+      setTenants([]);
+      setProperties([]);
+      setInvoices([]);
+    }
+  }, [authUser, authKey, refreshData]);
   
   const handleSetRole = (newRole: Role) => {
     // This function is primarily for the dev-mode role switcher.
     setRole(newRole);
-    if (newRole === 'tenant') {
-        // If the logged-in user is actually a tenant, use their ID
-        if (user && role === 'tenant') {
-             setCurrentTenantId(user.uid);
-        } else if (tenants.length > 0) {
-            // For demo purposes, pick the first tenant if the admin is just switching views
-            setCurrentTenantId(tenants[0].tenantId);
-        } else {
-            setCurrentTenantId(null);
-        }
+     if (newRole === 'tenant') {
+        const userTenancy = tenants.find(t => t.userId === authUser?.uid);
+        setCurrentTenantId(userTenancy ? userTenancy.id : (tenants[0]?.id || null));
     } else {
-        // Switching to admin view
         setCurrentTenantId(null);
     }
   };
@@ -101,9 +119,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         invoices, setInvoices, 
         tenants, setTenants, 
         properties, setProperties,
-        currentTenantId, 
-        refreshTenants,
-        refreshProperties
+        currentTenantId,
+        currentUser,
+        refreshData
     }}>
       {children}
     </AppContext.Provider>

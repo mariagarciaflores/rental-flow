@@ -7,7 +7,8 @@ export const TenantSchemaForCreation = z.object({
     propertyId: z.string().min(1, { message: 'Property is required' }),
     fixedMonthlyRent: z.number().min(0, { message: 'Rent must be a positive number' }),
     paysUtilities: z.boolean(),
+    startDate: z.string().min(1, { message: 'Start date is required' }),
 });
 
 
-export const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true });
+export const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true, name: true });

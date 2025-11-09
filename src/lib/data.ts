@@ -1,79 +1,42 @@
-import type { Property, Tenant, Invoice, Expense, InvoiceStatus } from './types';
+import type { Property, Tenant, Invoice, Expense, InvoiceStatus, User } from './types';
 
-// This is now used for initial seeding or as fallback, but main data comes from Firestore
-export const properties: Property[] = [
-  { propertyId: 'prop1', name: 'Main House A', address: '123 Maple St', adminId: 'admin1' },
-  { propertyId: 'prop2', name: 'Apartment 102', address: '456 Oak Ave, Unit 102', adminId: 'admin1' },
+// This file can now be largely deprecated or used for seeding scripts,
+// as all primary data is intended to come from Firestore.
+// The data below is kept for reference or potential fallback during development.
+
+export const users: User[] = [
+  // { id: 'admin1', name: 'Admin User', email: 'admin@test.com', roles: ['owner'], createdAt: '', updatedAt: ''},
+  // { id: 'tenant1', name: 'John Doe', email: 'john.doe@email.com', roles: ['tenant'], createdAt: '', updatedAt: '' },
+  // { id: 'tenant2', name: 'Jane Smith', email: 'jane.smith@email.com', roles: ['tenant'], createdAt: '', updatedAt: '' },
+  // { id: 'tenant3', name: 'Mike Johnson', email: 'mike.j@email.com', roles: ['tenant'], createdAt: '', updatedAt: '' },
 ];
 
-// This is now used for initial seeding or as fallback, but main data comes from Firestore
+export const properties: Property[] = [
+  // { id: 'prop1', name: 'Main House A', address: '123 Maple St', owners: ['admin1'], createdAt: '', updatedAt: '' },
+  // { id: 'prop2', name: 'Apartment 102', address: '456 Oak Ave, Unit 102', owners: ['admin1'], createdAt: '', updatedAt: '' },
+];
+
 export const tenants: Tenant[] = [
-  { tenantId: 'tenant1', name: 'John Doe', email: 'john.doe@email.com', propertyId: 'prop1', fixedMonthlyRent: 1200, paysUtilities: true },
-  { tenantId: 'tenant2', name: 'Jane Smith', email: 'jane.smith@email.com', propertyId: 'prop2', fixedMonthlyRent: 850, paysUtilities: false },
-  { tenantId: 'tenant3', name: 'Mike Johnson', email: 'mike.j@email.com', propertyId: 'prop1', fixedMonthlyRent: 1150, paysUtilities: true },
+  // { id: 'tenancy1', userId: 'tenant1', propertyId: 'prop1', fixedMonthlyRent: 1200, paysUtilities: true, startDate: '2023-01-01', endDate: null, active: true, createdAt: '', updatedAt: '' },
+  // { id: 'tenancy2', userId: 'tenant2', propertyId: 'prop2', fixedMonthlyRent: 850, paysUtilities: false, startDate: '2023-01-01', endDate: null, active: true, createdAt: '', updatedAt: '' },
+  // { id: 'tenancy3', userId: 'tenant3', propertyId: 'prop1', fixedMonthlyRent: 1150, paysUtilities: true, startDate: '2023-01-01', endDate: null, active: true, createdAt: '', updatedAt: '' },
 ];
 
 export const invoices: Invoice[] = [
-  {
-    invoiceId: 'inv1',
-    tenantId: 'tenant1',
-    month: '2024-07',
-    fixedRentAmount: 1200,
-    utilityFees: 75.50,
-    totalDue: 1275.50,
-    status: 'PAID' as InvoiceStatus,
-    paymentProofUrl: 'verified/receipt-jul-2024.jpg',
-    submittedPaymentAmount: 1275.50,
-    submissionDate: '2024-07-05T10:00:00Z',
-  },
-  {
-    invoiceId: 'inv2',
-    tenantId: 'tenant1',
-    month: '2024-08',
-    fixedRentAmount: 1200,
-    utilityFees: 80.00,
-    totalDue: 1280.00,
-    status: 'PENDING' as InvoiceStatus,
-    paymentProofUrl: 'https://picsum.photos/seed/receipt1/400/600',
-    submittedPaymentAmount: 1280.00,
-    submissionDate: '2024-08-04T14:30:00Z',
-  },
-  {
-    invoiceId: 'inv3',
-    tenantId: 'tenant2',
-    month: '2024-08',
-    fixedRentAmount: 850,
-    utilityFees: 0,
-    totalDue: 850.00,
-    status: 'PENDING' as InvoiceStatus,
-    paymentProofUrl: null,
-    submittedPaymentAmount: null,
-    submissionDate: null,
-  },
-  {
-    invoiceId: 'inv4',
-    tenantId: 'tenant2',
-    month: '2024-07',
-    fixedRentAmount: 850,
-    utilityFees: 0,
-    totalDue: 850.00,
-    status: 'PAID' as InvoiceStatus,
-    paymentProofUrl: 'verified/receipt-jul-2024-2.jpg',
-    submittedPaymentAmount: 850.00,
-    submissionDate: '2024-07-03T11:00:00Z',
-  },
-    {
-    invoiceId: 'inv5',
-    tenantId: 'tenant3',
-    month: '2024-08',
-    fixedRentAmount: 1150,
-    utilityFees: 65.00,
-    totalDue: 1215.00,
-    status: 'PARTIAL' as InvoiceStatus,
-    paymentProofUrl: null,
-    submittedPaymentAmount: 500,
-    submissionDate: '2024-08-06T09:00:00Z',
-  },
+  // {
+  //   id: 'inv1',
+  //   tenantId: 'tenancy1',
+  //   userId: 'tenant1',
+  //   propertyId: 'prop1',
+  //   month: '2024-07',
+  //   rentAmount: 1200,
+  //   utilitiesAmount: 75.50,
+  //   totalDue: 1275.50,
+  //   status: 'paid' as InvoiceStatus,
+  //   paymentDate: '2024-07-05T10:00:00Z',
+  //   createdAt: '',
+  //   updatedAt: '',
+  // },
 ];
 
 export const expenses: Expense[] = [

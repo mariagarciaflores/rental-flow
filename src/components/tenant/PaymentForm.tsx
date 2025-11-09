@@ -29,6 +29,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Upload } from 'lucide-react';
 import type { Invoice, InvoiceStatus } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 
 export function PaymentForm() {
   const t = useTranslation();
@@ -39,12 +41,13 @@ export function PaymentForm() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [fileName, setFileName] = useState('');
 
-  const { invoices, setInvoices, currentTenantId } = context!;
+  if (!context) return null;
+  const { invoices, refreshData, currentUser } = context;
 
   const pendingInvoices = useMemo(() => {
-    if (!currentTenantId) return [];
-    return invoices.filter(inv => inv.tenantId === currentTenantId && inv.status !== 'PAID');
-  }, [invoices, currentTenantId]);
+    if (!currentUser) return [];
+    return invoices.filter(inv => inv.userId === currentUser.id && inv.status !== 'paid');
+  }, [invoices, currentUser]);
 
   const handleSelectInvoice = (invoiceId: string) => {
     const newSelection = selectedInvoices.includes(invoiceId)
@@ -53,7 +56,7 @@ export function PaymentForm() {
     setSelectedInvoices(newSelection);
     
     const totalSelected = invoices
-      .filter(inv => newSelection.includes(inv.invoiceId))
+      .filter(inv => newSelection.includes(inv.id))
       .reduce((sum, inv) => sum + (inv.totalDue - (inv.submittedPaymentAmount || 0)), 0);
     setPaymentAmount(totalSelected);
   };
@@ -64,37 +67,50 @@ export function PaymentForm() {
     }
   };
   
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const totalDueSelected = invoices
-      .filter(inv => selectedInvoices.includes(inv.invoiceId))
+      .filter(inv => selectedInvoices.includes(inv.id))
       .reduce((sum, inv) => sum + inv.totalDue, 0);
 
-    const newStatus: InvoiceStatus = paymentAmount >= totalDueSelected ? 'PENDING' : 'PARTIAL';
+    const newStatus: InvoiceStatus = paymentAmount >= totalDueSelected ? 'pending' : 'partial';
 
-    setInvoices(prev => prev.map(inv => {
-      if (selectedInvoices.includes(inv.invoiceId)) {
-        return {
-          ...inv,
-          // Set to PENDING for admin verification, not directly to PAID
-          status: newStatus, 
-          paymentProofUrl: PlaceHolderImages[0].imageUrl, // Simulated upload
-          // This logic is simplistic. A real app would handle partial payments better.
-          submittedPaymentAmount: (inv.submittedPaymentAmount || 0) + paymentAmount,
-          submissionDate: new Date().toISOString(),
-        };
-      }
-      return inv;
-    }));
+    try {
+        const batch = writeBatch(db);
+        selectedInvoices.forEach(invoiceId => {
+            const invoiceRef = doc(db, 'invoices', invoiceId);
+            const invoice = invoices.find(i => i.id === invoiceId);
+            if (!invoice) return;
 
-    toast({
-      title: 'Payment Submitted',
-      description: 'Your payment has been submitted for verification by the property manager.',
-    });
+            batch.update(invoiceRef, {
+                status: newStatus,
+                paymentProofUrl: PlaceHolderImages[0].imageUrl, // Simulated upload
+                submittedPaymentAmount: (invoice.submittedPaymentAmount || 0) + (paymentAmount / selectedInvoices.length), // Distribute payment
+                submissionDate: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+        });
 
-    setOpen(false);
-    setSelectedInvoices([]);
-    setPaymentAmount(0);
-    setFileName('');
+        await batch.commit();
+
+        toast({
+          title: 'Payment Submitted',
+          description: 'Your payment has been submitted for verification by the property manager.',
+        });
+
+        await refreshData();
+        setOpen(false);
+        setSelectedInvoices([]);
+        setPaymentAmount(0);
+        setFileName('');
+
+    } catch (error) {
+        console.error("Payment submission failed:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to submit payment. Please try again."
+        });
+    }
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -125,8 +141,8 @@ export function PaymentForm() {
                         </TableHeader>
                         <TableBody>
                             {pendingInvoices.map(inv => (
-                                <TableRow key={inv.invoiceId}>
-                                    <TableCell><Checkbox checked={selectedInvoices.includes(inv.invoiceId)} onCheckedChange={() => handleSelectInvoice(inv.invoiceId)} /></TableCell>
+                                <TableRow key={inv.id}>
+                                    <TableCell><Checkbox checked={selectedInvoices.includes(inv.id)} onCheckedChange={() => handleSelectInvoice(inv.id)} /></TableCell>
                                     <TableCell>{inv.month}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(inv.totalDue - (inv.submittedPaymentAmount || 0))}</TableCell>
                                 </TableRow>

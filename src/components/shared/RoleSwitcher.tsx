@@ -19,16 +19,22 @@ export default function RoleSwitcher() {
     return null;
   }
 
-  const { role, setRole } = context;
+  const { role, setRole, currentUser } = context;
+
+  // Don't show switcher if user only has one role
+  if (!currentUser || currentUser.roles.length < 2) {
+    return null;
+  }
 
   return (
-    <Select value={role} onValueChange={(value: Role) => setRole(value)}>
+    <Select value={role || undefined} onValueChange={(value: Role) => setRole(value)}>
       <SelectTrigger className="w-[120px]">
-        <SelectValue placeholder={t('role.admin')} />
+        <SelectValue placeholder={t('role.owner')} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="admin">{t('role.admin')}</SelectItem>
-        <SelectItem value="tenant">{t('role.tenant')}</SelectItem>
+        {currentUser.roles.map(r => (
+            <SelectItem key={r} value={r}>{t(`role.${r}`)}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
