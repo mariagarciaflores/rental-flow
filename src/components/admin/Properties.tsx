@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useContext, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useContext, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -127,10 +127,15 @@ function PropertyDialog({ property, children }: { property?: Property, children:
 export default function PropertyList() {
   const t = useTranslation();
   const context = useContext(AppContext);
+  const { user: authUser } = useAuth()!;
   const { toast } = useToast();
 
-  if (!context) return null;
+  if (!context || !authUser) return null;
   const { properties, refreshData } = context;
+
+  const userProperties = useMemo(() => {
+    return properties.filter(p => p.owners.includes(authUser.uid));
+  }, [properties, authUser.uid]);
 
   useEffect(() => {
     refreshData();
@@ -163,45 +168,51 @@ export default function PropertyList() {
         </PropertyDialog>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('table.header.property')}</TableHead>
-              <TableHead>{t('table.header.address')}</TableHead>
-              <TableHead className="text-right">{t('table.header.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {properties.map((property) => (
-              <TableRow key={property.id}>
-                <TableCell className="font-medium">{property.name}</TableCell>
-                <TableCell>{property.address}</TableCell>
-                <TableCell className="text-right space-x-2">
-                    <PropertyDialog property={property}>
-                         <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
-                    </PropertyDialog>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the property.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(property.id)}>Continue</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                </TableCell>
+        {userProperties.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('table.header.property')}</TableHead>
+                <TableHead>{t('table.header.address')}</TableHead>
+                <TableHead className="text-right">{t('table.header.actions')}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {userProperties.map((property) => (
+                <TableRow key={property.id}>
+                  <TableCell className="font-medium">{property.name}</TableCell>
+                  <TableCell>{property.address}</TableCell>
+                  <TableCell className="text-right space-x-2">
+                      <PropertyDialog property={property}>
+                           <Button variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
+                      </PropertyDialog>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the property.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(property.id)}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="text-center py-10">
+            <p className="text-muted-foreground">Agrega tu propiedad</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
