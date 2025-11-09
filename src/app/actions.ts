@@ -47,6 +47,39 @@ export async function verifyReceiptAction(formData: FormData) {
   }
 }
 
+const UserDocumentSchema = z.object({
+    uid: z.string(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().optional(),
+});
+
+export async function createUserDocumentAction(userData: z.infer<typeof UserDocumentSchema>): Promise<{success: boolean; error?: string;}> {
+    try {
+        const validatedData = UserDocumentSchema.parse(userData);
+        const now = new Date().toISOString();
+        const userRef = adminDb.collection('users').doc(validatedData.uid);
+        
+        const newUser: Omit<User, 'id'> = {
+            name: validatedData.name,
+            email: validatedData.email,
+            phone: validatedData.phone || '',
+            roles: ['owner', 'tenant'], // Assign both roles on signup
+            createdAt: now,
+            updatedAt: now
+        };
+
+        await userRef.set(newUser);
+        
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to create user document:", error);
+        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred creating the user document.";
+        return { success: false, error: errorMessage };
+    }
+}
+
+
 export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>): Promise<{success: boolean, link?: string, error?: string}> {
     try {
         const validatedData = TenantSchemaForCreation.parse(tenantData);
