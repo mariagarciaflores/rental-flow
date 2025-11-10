@@ -80,7 +80,7 @@ export async function createUserDocumentAction(userData: z.infer<typeof UserDocu
 }
 
 
-export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>): Promise<{success: boolean, link?: string, error?: string}> {
+export async function createTenantAction(tenantData: z.infer<typeof TenantSchemaForCreation>): Promise<{success: boolean, isNewUser: boolean, error?: string}> {
     try {
         const validatedData = TenantSchemaForCreation.parse(tenantData);
         const now = new Date().toISOString();
@@ -91,7 +91,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         // 1. Check if user already exists
         const userQuery = await usersRef.where('email', '==', validatedData.email).limit(1).get();
         let userId: string;
-        let link: string | undefined = undefined;
+        let isNewUser = false;
         
         if (!userQuery.empty) {
             // User exists
@@ -109,6 +109,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             }
         } else {
             // User does not exist, create new user in Auth and Firestore
+            isNewUser = true;
             const userRecord = await adminAuth.createUser({
                 email: validatedData.email,
                 emailVerified: false,
@@ -127,10 +128,9 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             };
             batch.set(userRef, newUser);
 
-            // Generate password reset link for the new user.
-            // This call triggers Firebase's default email template if configured.
-            // We get the link back but choose not to return it for security.
-            link = await adminAuth.generatePasswordResetLink(validatedData.email);
+            // Trigger Firebase's default email template for password reset.
+            // This does NOT send the email from our server, but flags it for Firebase to send.
+             await adminAuth.generatePasswordResetLink(validatedData.email);
         }
         
         // 2. Add tenancy data to 'tenants' collection
@@ -150,8 +150,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 
         await batch.commit();
 
-        // Return a 'link' only if a new user was created, to signal the UI.
-        return { success: true, link: link };
+        return { success: true, isNewUser };
 
     } catch (error: any) {
         console.error("Failed to save tenant: ", error);
@@ -163,7 +162,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
         } else if (error instanceof Error) {
             errorMessage = error.message;
         }
-        return { success: false, error: errorMessage };
+        return { success: false, isNewUser: false, error: errorMessage };
     }
 }
 
@@ -208,20 +207,6 @@ export async function deleteTenantAction(userId: string, tenantId: string): Prom
         return { success: true };
     } catch (error: any) {
         console.error("Failed to delete tenant:", error);
-        const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
-        return { success: false, error: errorMessage };
-    }
-}
-
-
-export async function generateAndCopyTenantPasswordLinkAction(email: string): Promise<{success: boolean; link?: string; error?: string;}> {
-    try {
-        // This is the function that generates the link on demand.
-        const link = await adminAuth.generatePasswordResetLink(email);
-        // It returns the link to the client to be shown in a toast.
-        return { success: true, link };
-    } catch (error: any) {
-        console.error("Failed to generate password reset link:", error);
         const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
         return { success: false, error: errorMessage };
     }

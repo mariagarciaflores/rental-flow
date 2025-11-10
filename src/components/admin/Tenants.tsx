@@ -37,8 +37,8 @@ import { AppContext } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/lib/i18n';
 import type { Tenant, Property, User } from '@/lib/types';
-import { createTenantAction, updateTenantAction, deleteTenantAction, generateAndCopyTenantPasswordLinkAction } from '@/app/actions';
-import { PlusCircle, Edit, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { createTenantAction, updateTenantAction, deleteTenantAction } from '@/app/actions';
+import { PlusCircle, Edit, Trash2, Mail, Loader2 } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -49,6 +49,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
+import { auth } from '@/lib/firebase/client';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 
 const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
@@ -173,17 +175,15 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
             } else { // Adding
                 result = await createTenantAction(data);
                 if (result.success) {
-                     if (result.link) {
+                     if (result.isNewUser) {
+                        // The email will be sent by Firebase automatically if configured
+                        // or can be sent manually from the client.
                         toast({ 
                             title: 'New Tenant Created', 
-                            description: (
-                                <div className="space-y-2">
-                                    <p>Share this link with the new tenant to set their password:</p>
-                                    <Input type="text" readOnly value={result.link} className="bg-muted" />
-                                </div>
-                            ),
-                            duration: 20000,
+                            description: `An email will be sent to ${data.email} to set their password.`
                         });
+                        // Client-side sending
+                        await sendPasswordResetEmail(auth, data.email);
                     } else {
                         toast({
                             title: 'Tenancy Added to Existing User',
@@ -223,7 +223,7 @@ export default function TenantManagement() {
   const { user: authUser } = useAuth()!;
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [sendingFor, setSendingFor] = useState<string | null>(null);
 
   useEffect(() => {
     context?.refreshData();
@@ -255,26 +255,22 @@ export default function TenantManagement() {
     }
   };
 
-  const handleGenerateLink = (tenantUser: User) => {
-    if (!tenantUser) return;
-    setGeneratingFor(tenantUser.id);
+  const handleSendResetEmail = (tenantUser: User) => {
+    if (!tenantUser?.email) return;
+    setSendingFor(tenantUser.id);
     startTransition(async () => {
-        const result = await generateAndCopyTenantPasswordLinkAction(tenantUser.email);
-        if (result.success && result.link) {
+        try {
+            await sendPasswordResetEmail(auth, tenantUser.email);
             toast({ 
-                title: 'Password Link Generated', 
-                description: (
-                    <div className="space-y-2">
-                        <p>Please copy and share this link with {tenantUser.name}:</p>
-                        <Input type="text" readOnly value={result.link} className="bg-muted"/>
-                    </div>
-                ),
-                duration: 20000,
+                title: 'Password Reset Email Sent', 
+                description: `An email has been sent to ${tenantUser.email}.`
             });
-        } else {
-            toast({ variant: 'destructive', title: 'Failed to generate link', description: result.error });
+        } catch (error: any) {
+            console.error("Failed to send password reset email:", error);
+            toast({ variant: 'destructive', title: 'Failed to send email', description: error.message });
+        } finally {
+            setSendingFor(null);
         }
-        setGeneratingFor(null);
     });
   };
 
@@ -309,9 +305,9 @@ export default function TenantManagement() {
                 <TableCell>{tenancy.user?.phone}</TableCell>
                 <TableCell className="text-right space-x-2">
                     {tenancy.user && (
-                        <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(tenancy.user!)} disabled={isPending && generatingFor === tenancy.user.id}>
-                            {isPending && generatingFor === tenancy.user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4"/>}
-                            <span className="sr-only">Generate password link</span>
+                        <Button variant="ghost" size="icon" onClick={() => handleSendResetEmail(tenancy.user!)} disabled={isPending && sendingFor === tenancy.user.id}>
+                            {isPending && sendingFor === tenancy.user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4"/>}
+                            <span className="sr-only">Send password reset email</span>
                         </Button>
                     )}
                     <TenantDialog tenant={tenancy} properties={userProperties}>
