@@ -3,14 +3,20 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     function isOwner() {
+      // Check if the requesting user has the 'owner' role in their own user document.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']);
     }
 
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // An owner can create a user, or update another user's roles to add 'tenant'
+      // 1. A user can read their own document.
+      // 2. An owner can read any user document (needed for email lookup).
+      allow read: if request.auth != null && (request.auth.uid == userId || isOwner());
+      // An owner can create a user.
       allow create: if request.auth != null && isOwner();
-      allow update: if request.auth != null && isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles', 'updatedAt']);
+      // An owner can update another user's roles (e.g., to add 'tenant').
+      allow update: if request.auth != null && isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles', 'updatedAt', 'phone']);
+      // An owner can delete a user (part of deleting a tenant).
+      allow delete: if request.auth != null && isOwner();
     }
 
     match /properties/{document=**} {
