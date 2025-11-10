@@ -127,7 +127,9 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
             };
             batch.set(userRef, newUser);
 
-            // Generate password reset link for the new user
+            // Generate password reset link for the new user.
+            // This call triggers Firebase's default email template if configured.
+            // We get the link back but choose not to return it for security.
             link = await adminAuth.generatePasswordResetLink(validatedData.email);
         }
         
@@ -148,6 +150,7 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 
         await batch.commit();
 
+        // Return a 'link' only if a new user was created, to signal the UI.
         return { success: true, link: link };
 
     } catch (error: any) {
@@ -213,7 +216,9 @@ export async function deleteTenantAction(userId: string, tenantId: string): Prom
 
 export async function generateAndCopyTenantPasswordLinkAction(email: string): Promise<{success: boolean; link?: string; error?: string;}> {
     try {
+        // This is the function that generates the link on demand.
         const link = await adminAuth.generatePasswordResetLink(email);
+        // It returns the link to the client to be shown in a toast.
         return { success: true, link };
     } catch (error: any) {
         console.error("Failed to generate password reset link:", error);
