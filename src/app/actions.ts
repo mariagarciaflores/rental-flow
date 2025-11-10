@@ -84,31 +84,55 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
     try {
         const validatedData = TenantSchemaForCreation.parse(tenantData);
         const now = new Date().toISOString();
-
-        // 1. Create user in Firebase Auth
-        const userRecord = await adminAuth.createUser({
-            email: validatedData.email,
-            emailVerified: false, 
-            displayName: validatedData.name,
-        });
-        
+        const usersRef = adminDb.collection('users');
+        const tenantsRef = adminDb.collection('tenants');
         const batch = adminDb.batch();
-        const userId = userRecord.uid;
 
-        // 2. Add user data to 'users' collection with role
-        const userRef = adminDb.collection('users').doc(userId);
-        const newUser: Omit<User, 'id'> = {
-            name: validatedData.name,
-            email: validatedData.email,
-            phone: validatedData.phone || '',
-            roles: ['tenant'],
-            createdAt: now,
-            updatedAt: now
-        };
-        batch.set(userRef, newUser);
+        // 1. Check if user already exists
+        const userQuery = await usersRef.where('email', '==', validatedData.email).limit(1).get();
+        let userId: string;
+        let link: string | undefined = undefined;
+        
+        if (!userQuery.empty) {
+            // User exists
+            const existingUser = userQuery.docs[0];
+            userId = existingUser.id;
+            const userData = existingUser.data() as User;
 
-        // 3. Add tenancy data to 'tenants' collection
-        const tenantRef = adminDb.collection('tenants').doc(); // Auto-generate ID
+            // Ensure user has 'tenant' role
+            if (!userData.roles.includes('tenant')) {
+                const userRef = usersRef.doc(userId);
+                batch.update(userRef, {
+                    roles: FieldValue.arrayUnion('tenant'),
+                    updatedAt: now,
+                });
+            }
+        } else {
+            // User does not exist, create new user in Auth and Firestore
+            const userRecord = await adminAuth.createUser({
+                email: validatedData.email,
+                emailVerified: false,
+                displayName: validatedData.name,
+            });
+            userId = userRecord.uid;
+
+            const userRef = usersRef.doc(userId);
+            const newUser: Omit<User, 'id'> = {
+                name: validatedData.name,
+                email: validatedData.email,
+                phone: validatedData.phone || '',
+                roles: ['tenant'],
+                createdAt: now,
+                updatedAt: now,
+            };
+            batch.set(userRef, newUser);
+
+            // Generate password reset link for the new user
+            link = await adminAuth.generatePasswordResetLink(validatedData.email);
+        }
+        
+        // 2. Add tenancy data to 'tenants' collection
+        const tenantRef = tenantsRef.doc(); // Auto-generate ID
         const newTenant: Omit<Tenant, 'id'> = {
             userId: userId,
             propertyId: validatedData.propertyId,
@@ -124,15 +148,12 @@ export async function createTenantAction(tenantData: z.infer<typeof TenantSchema
 
         await batch.commit();
 
-        // 4. Generate password reset link for initial password setup
-        const link = await adminAuth.generatePasswordResetLink(validatedData.email);
-
         return { success: true, link: link };
 
     } catch (error: any) {
         console.error("Failed to save tenant: ", error);
         let errorMessage = 'An unknown error occurred.';
-        if (error.code === 'auth/email-already-exists') {
+        if (error.code === 'auth/email-already-exists' && !error.message.includes('userQuery')) { // Avoid shadowing our own logic
             errorMessage = 'This email is already in use by another user.';
         } else if (error instanceof z.ZodError) {
             errorMessage = 'Validation failed: ' + error.errors.map(e => e.message).join(', ');

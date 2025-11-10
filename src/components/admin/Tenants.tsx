@@ -172,17 +172,24 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
                 }
             } else { // Adding
                 result = await createTenantAction(data);
-                if (result.success && result.link) {
-                    toast({ 
-                        title: 'Tenant Created Successfully', 
-                        description: (
-                            <div className="space-y-2">
-                                <p>Share this link with the tenant to set their password:</p>
-                                <Input type="text" readOnly value={result.link} className="bg-muted" />
-                            </div>
-                        ),
-                        duration: 20000,
-                    });
+                if (result.success) {
+                     if (result.link) {
+                        toast({ 
+                            title: 'New Tenant Created', 
+                            description: (
+                                <div className="space-y-2">
+                                    <p>Share this link with the new tenant to set their password:</p>
+                                    <Input type="text" readOnly value={result.link} className="bg-muted" />
+                                </div>
+                            ),
+                            duration: 20000,
+                        });
+                    } else {
+                        toast({
+                            title: 'Tenancy Added to Existing User',
+                            description: 'The user can now see this tenancy in their account.'
+                        });
+                    }
                 } else {
                     throw new Error(result.error);
                 }

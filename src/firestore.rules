@@ -1,31 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read their own user document to get their role.
+    
+    function isOwner() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['owner']);
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      // Admins can create/update user roles. Tenants cannot.
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // An owner can create a user, or update another user's roles to add 'tenant'
+      allow create: if request.auth != null && isOwner();
+      allow update: if request.auth != null && isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles', 'updatedAt']);
     }
 
-    // Tenants and Admins need to read properties.
     match /properties/{document=**} {
         allow read: if request.auth != null;
+        allow write: if request.auth != null && isOwner();
     }
 
-    // Admins can write to properties.
-    match /properties/{propertyId} {
-        allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Tenants and Admins need to read tenants.
     match /tenants/{document=**} {
        allow read: if request.auth != null;
+       allow write: if request.auth != null && isOwner();
     }
-    
-    // Admins can write to tenants.
-    match /tenants/{tenantId} {
-        allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    match /invoices/{document=**} {
+      // Allow any authenticated user to read the invoices list. Client-side filters what is shown.
+      allow read: if request.auth != null;
+      // Allow owners to write, or tenants to update their own invoices (e.g., submitting payment)
+      allow write: if request.auth != null && (isOwner() || request.auth.uid == resource.data.userId);
     }
   }
 }
