@@ -1,14 +1,24 @@
 import { z } from 'zod';
 
+// This schema is now simplified as client-side validation is handled in the component
+// to support internationalization. This can be used for server-side validation if needed.
 export const TenantSchemaForCreation = z.object({
-    name: z.string().min(1, { message: 'El nombre del inquilino es requreido' }),
-    email: z.string().email({ message: 'El email debe ser válido' }),
-    phone: z.string().regex(/^\+/, { message: 'El teléfono debe incluir el código de país (ej. +1...)' }),
-    propertyId: z.string().min(1, { message: 'Property is required' }),
-    fixedMonthlyRent: z.number().min(0, { message: 'La renta no debe ser un número negativo' }),
+    name: z.string(),
+    email: z.string().email(),
+    phone: z.string(),
+    propertyId: z.string(),
+    fixedMonthlyRent: z.number(),
     paysUtilities: z.boolean(),
-    startDate: z.string().min(1, { message: 'La fecha de inicio es requerida' }),
+    startDate: z.string(),
 });
 
 
-export const TenantSchemaForEditing = TenantSchemaForCreation.omit({ email: true, name: true });
+export const TenantSchemaForEditing = z.object({
+    propertyId: z.string(),
+    fixedMonthlyRent: z.number(),
+    paysUtilities: z.boolean(),
+    startDate: z.string(),
+    phone: z.string(),
+});
+
+    

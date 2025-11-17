@@ -12,8 +12,8 @@ export const translations = {
     'role.owner': 'Owner',
     'role.tenant': 'Tenant',
     'status.paid': 'PAID',
+    'status.due': 'DUE',
     'status.pending': 'PENDING',
-    'status.partial': 'PARTIAL',
     'debt.outstanding': 'Outstanding Debt',
     'action.submit_payment': 'Submit Payment',
     'action.mark_paid': 'Mark as PAID',
@@ -77,9 +77,15 @@ export const translations = {
     'verification.success': 'Payment verified and marked as PAID.',
     'verification.rejected': 'Payment rejected. Tenant will be notified.',
     'verification.error': 'AI verification failed. Please try again.',
-    'invoice_generator.title': 'Generate Monthly Invoices',
-    'invoice_generator.description': 'This will create a PENDING invoice for each active tenant for the selected month.',
-    'invoice_generator.success': 'Invoices generated successfully for',
+    'invoice_generator.title': 'Generate Missing Invoices',
+    'invoice_generator.description': 'This will check all tenants and create any missing invoices from their start date until the current month.',
+    'invoice_generator.success': 'Invoice check complete.',
+    'validation.name.required': 'Tenant name is required',
+    'validation.email.invalid': 'Email must be a valid email',
+    'validation.phone.invalid': 'Phone must include country code (e.g. +1...)',
+    'validation.rent.negative': 'Rent cannot be a negative number',
+    'validation.startDate.required': 'Start date is required',
+    'validation.propertyId.required': 'Property is required',
   },
   es: {
     'app.title': 'RentalFlow Manager',
@@ -91,8 +97,8 @@ export const translations = {
     'role.owner': 'Propietario',
     'role.tenant': 'Inquilino',
     'status.paid': 'PAGADO',
+    'status.due': 'DEUDA',
     'status.pending': 'PENDIENTE',
-    'status.partial': 'PARCIAL',
     'debt.outstanding': 'Deuda Pendiente',
     'action.submit_payment': 'Enviar Pago',
     'action.mark_paid': 'Marcar como PAGADO',
@@ -156,9 +162,15 @@ export const translations = {
     'verification.success': 'Pago verificado y marcado como PAGADO.',
     'verification.rejected': 'Pago rechazado. Se notificará al inquilino.',
     'verification.error': 'La verificación con IA falló. Por favor, intente de nuevo.',
-    'invoice_generator.title': 'Generar Facturas Mensuales',
-    'invoice_generator.description': 'Esto creará una factura PENDIENTE para cada inquilino activo para el mes seleccionado.',
-    'invoice_generator.success': 'Facturas generadas con éxito para',
+    'invoice_generator.title': 'Generar Facturas Faltantes',
+    'invoice_generator.description': 'Esto revisará a todos los inquilinos y creará las facturas faltantes desde su fecha de inicio hasta el mes actual.',
+    'invoice_generator.success': 'Revisión de facturas completada.',
+    'validation.name.required': 'El nombre del inquilino es requerido',
+    'validation.email.invalid': 'El email debe ser válido',
+    'validation.phone.invalid': 'El teléfono debe incluir el código de país (ej. +1...)',
+    'validation.rent.negative': 'La renta no debe ser un número negativo',
+    'validation.startDate.required': 'La fecha de inicio es requerida',
+    'validation.propertyId.required': 'La propiedad es requerida',
   },
 };
 
@@ -181,3 +193,5 @@ export function useTranslation() {
     return translation;
   };
 }
+
+    

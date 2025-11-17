@@ -48,12 +48,11 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
-import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 import { auth } from '@/lib/firebase/client';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 
-const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
+const emptyTenantData = {
   name: '',
   email: '',
   phone: '',
@@ -66,6 +65,28 @@ const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
 
 function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
+  
+  // Define schema inside the component to use the translation hook
+  const TenantSchema = useMemo(() => {
+    const baseSchema = z.object({
+      propertyId: z.string().min(1, { message: t('validation.propertyId.required') }),
+      fixedMonthlyRent: z.number().min(0, { message: t('validation.rent.negative') }),
+      paysUtilities: z.boolean(),
+      startDate: z.string().min(1, { message: t('validation.startDate.required') }),
+      phone: z.string().regex(/^\+/, { message: t('validation.phone.invalid') }),
+    });
+
+    if (isEditing) {
+      return baseSchema; // No need to validate name and email when editing
+    }
+
+    return baseSchema.extend({
+      name: z.string().min(1, { message: t('validation.name.required') }),
+      email: z.string().email({ message: t('validation.email.invalid') }),
+    });
+  }, [t, isEditing]);
+
+
   const initialData = isEditing && tenant ? {
       propertyId: tenant.propertyId,
       fixedMonthlyRent: tenant.fixedMonthlyRent,
@@ -80,8 +101,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSave = () => {
-    const schema = isEditing ? TenantSchemaForEditing : TenantSchemaForCreation;
-    const result = schema.safeParse(formData);
+    const result = TenantSchema.safeParse(formData);
 
     if (!result.success) {
       const newErrors: Record<string, string> = {};
@@ -114,7 +134,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">Phone</Label>
             <div className="col-span-3">
-              <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              <Input id="phone" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
               {errors.phone && <p className="text-destructive text-sm mt-1">{errors.phone}</p>}
             </div>
         </div>
@@ -341,3 +361,5 @@ export default function TenantManagement() {
     </Card>
   );
 }
+
+    
