@@ -67,12 +67,10 @@ const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
 function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
   const initialData = isEditing && tenant ? {
-      // For editing, we don't change user details, only tenancy details
       propertyId: tenant.propertyId,
       fixedMonthlyRent: tenant.fixedMonthlyRent,
       paysUtilities: tenant.paysUtilities,
       startDate: tenant.startDate,
-      // User details for display, but can be part of the form state for editing tenancy-related user fields like phone
       name: tenant.user?.name || '',
       email: tenant.user?.email || '',
       phone: tenant.user?.phone || '',
@@ -115,7 +113,10 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">Phone</Label>
-            <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              {errors.phone && <p className="text-destructive text-sm mt-1">{errors.phone}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="property" className="text-right">{t('form.property')}</Label>
@@ -140,7 +141,10 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="startDate" className="text-right">Start Date</Label>
-            <Input id="startDate" type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="startDate" type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+              {errors.startDate && <p className="text-destructive text-sm mt-1">{errors.startDate}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
              <Label htmlFor="paysUtilities" className="text-right">{t('form.pays_utilities')}</Label>
@@ -176,8 +180,6 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
                 result = await createTenantAction(data);
                 if (result.success) {
                      if (result.isNewUser) {
-                        // The email will be sent by Firebase automatically if configured
-                        // or can be sent manually from the client.
                         toast({ 
                             title: 'New Tenant Created', 
                             description: `An email will be sent to ${data.email} to set their password.`
