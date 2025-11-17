@@ -43,6 +43,3 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
-
-# Ignorar configuración sensible de Firebase
-src/lib/firebase/config.ts

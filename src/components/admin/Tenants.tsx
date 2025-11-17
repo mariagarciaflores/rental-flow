@@ -48,12 +48,11 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
-import { TenantSchemaForCreation, TenantSchemaForEditing } from '@/lib/schemas';
 import { auth } from '@/lib/firebase/client';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 
-const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
+const emptyTenantData = {
   name: '',
   email: '',
   phone: '',
@@ -66,13 +65,33 @@ const emptyTenantData: z.infer<typeof TenantSchemaForCreation> = {
 
 function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
+  
+  // Define schema inside the component to use the translation hook
+  const TenantSchema = useMemo(() => {
+    const baseSchema = z.object({
+      propertyId: z.string().min(1, { message: t('validation.propertyId.required') }),
+      fixedMonthlyRent: z.number().min(0, { message: t('validation.rent.negative') }),
+      paysUtilities: z.boolean(),
+      startDate: z.string().min(1, { message: t('validation.startDate.required') }),
+      phone: z.string().regex(/^\+\d{1,3}\d{4,}$/, { message: t('validation.phone.invalid') }),
+    });
+
+    if (isEditing) {
+      return baseSchema; // No need to validate name and email when editing
+    }
+
+    return baseSchema.extend({
+      name: z.string().min(1, { message: t('validation.name.required') }),
+      email: z.string().email({ message: t('validation.email.invalid') }),
+    });
+  }, [t, isEditing]);
+
+
   const initialData = isEditing && tenant ? {
-      // For editing, we don't change user details, only tenancy details
       propertyId: tenant.propertyId,
       fixedMonthlyRent: tenant.fixedMonthlyRent,
       paysUtilities: tenant.paysUtilities,
       startDate: tenant.startDate,
-      // User details for display, but can be part of the form state for editing tenancy-related user fields like phone
       name: tenant.user?.name || '',
       email: tenant.user?.email || '',
       phone: tenant.user?.phone || '',
@@ -81,9 +100,32 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
   const [formData, setFormData] = useState(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData);
+
+    // If there was an error on this field, try to re-validate it
+    if (errors[field]) {
+      // Only validate if the field exists in the schema
+      if (field in TenantSchema.shape) {
+        const fieldSchema = TenantSchema.shape[field];
+        if (fieldSchema) {
+          const result = fieldSchema.safeParse(value);
+          if (result.success) {
+            // If validation for this field passes, remove the error
+            setErrors(prevErrors => {
+              const { [field]: _, ...rest } = prevErrors;
+              return rest;
+            });
+          }
+        }
+      }
+    }
+  };
+
+
   const handleSave = () => {
-    const schema = isEditing ? TenantSchemaForEditing : TenantSchemaForCreation;
-    const result = schema.safeParse(formData);
+    const result = TenantSchema.safeParse(formData);
 
     if (!result.success) {
       const newErrors: Record<string, string> = {};
@@ -102,25 +144,28 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">{t('form.name')}</Label>
             <div className="col-span-3">
-                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} disabled={isEditing} />
+                <Input id="name" value={formData.name} onChange={e => handleInputChange('name', e.target.value)} disabled={isEditing} />
                 {errors.name && <p className="text-destructive text-sm mt-1">{errors.name}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="email" className="text-right">Email</Label>
              <div className="col-span-3">
-                <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} disabled={isEditing} />
+                <Input id="email" type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} disabled={isEditing} />
                 {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">Phone</Label>
-            <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="phone" value={formData.phone || ''} onChange={e => handleInputChange('phone', e.target.value)} />
+              {errors.phone && <p className="text-destructive text-sm mt-1">{errors.phone}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="property" className="text-right">{t('form.property')}</Label>
             <div className="col-span-3">
-                <Select value={formData.propertyId} onValueChange={value => setFormData({...formData, propertyId: value})}>
+                <Select value={formData.propertyId} onValueChange={value => handleInputChange('propertyId', value)}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select a property" />
                     </SelectTrigger>
@@ -134,17 +179,20 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="rent" className="text-right">{t('form.rent')}</Label>
              <div className="col-span-3">
-                <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => setFormData({...formData, fixedMonthlyRent: Number(e.target.value)})} />
+                <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => handleInputChange('fixedMonthlyRent', Number(e.target.value))} />
                 {errors.fixedMonthlyRent && <p className="text-destructive text-sm mt-1">{errors.fixedMonthlyRent}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="startDate" className="text-right">Start Date</Label>
-            <Input id="startDate" type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="startDate" type="date" value={formData.startDate} onChange={e => handleInputChange('startDate', e.target.value)} />
+              {errors.startDate && <p className="text-destructive text-sm mt-1">{errors.startDate}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
              <Label htmlFor="paysUtilities" className="text-right">{t('form.pays_utilities')}</Label>
-            <Checkbox id="paysUtilities" checked={formData.paysUtilities} onCheckedChange={checked => setFormData({...formData, paysUtilities: !!checked})} />
+            <Checkbox id="paysUtilities" checked={formData.paysUtilities} onCheckedChange={checked => handleInputChange('paysUtilities', !!checked)} />
         </div>
         <DialogFooter>
             <Button onClick={handleSave}>{t('action.save')}</Button>
@@ -176,8 +224,6 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
                 result = await createTenantAction(data);
                 if (result.success) {
                      if (result.isNewUser) {
-                        // The email will be sent by Firebase automatically if configured
-                        // or can be sent manually from the client.
                         toast({ 
                             title: 'New Tenant Created', 
                             description: `An email will be sent to ${data.email} to set their password.`
