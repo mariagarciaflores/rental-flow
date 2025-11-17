@@ -100,6 +100,25 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
   const [formData, setFormData] = useState(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData);
+
+    // If there was an error on this field, try to re-validate it
+    if (errors[field]) {
+      const fieldSchema = TenantSchema.pick({ [field]: true } as any);
+      const result = fieldSchema.safeParse({ [field]: value });
+      if (result.success) {
+        // If validation for this field passes, remove the error
+        setErrors(prevErrors => {
+          const { [field]: _, ...rest } = prevErrors;
+          return rest;
+        });
+      }
+    }
+  };
+
+
   const handleSave = () => {
     const result = TenantSchema.safeParse(formData);
 
@@ -120,28 +139,28 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">{t('form.name')}</Label>
             <div className="col-span-3">
-                <Input id="name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} disabled={isEditing} />
+                <Input id="name" value={formData.name} onChange={e => handleInputChange('name', e.target.value)} disabled={isEditing} />
                 {errors.name && <p className="text-destructive text-sm mt-1">{errors.name}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="email" className="text-right">Email</Label>
              <div className="col-span-3">
-                <Input id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} disabled={isEditing} />
+                <Input id="email" type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} disabled={isEditing} />
                 {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">Phone</Label>
             <div className="col-span-3">
-              <Input id="phone" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              <Input id="phone" value={formData.phone || ''} onChange={e => handleInputChange('phone', e.target.value)} />
               {errors.phone && <p className="text-destructive text-sm mt-1">{errors.phone}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="property" className="text-right">{t('form.property')}</Label>
             <div className="col-span-3">
-                <Select value={formData.propertyId} onValueChange={value => setFormData({...formData, propertyId: value})}>
+                <Select value={formData.propertyId} onValueChange={value => handleInputChange('propertyId', value)}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select a property" />
                     </SelectTrigger>
@@ -155,20 +174,20 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="rent" className="text-right">{t('form.rent')}</Label>
              <div className="col-span-3">
-                <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => setFormData({...formData, fixedMonthlyRent: Number(e.target.value)})} />
+                <Input id="rent" type="number" value={formData.fixedMonthlyRent} onChange={e => handleInputChange('fixedMonthlyRent', Number(e.target.value))} />
                 {errors.fixedMonthlyRent && <p className="text-destructive text-sm mt-1">{errors.fixedMonthlyRent}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="startDate" className="text-right">Start Date</Label>
             <div className="col-span-3">
-              <Input id="startDate" type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+              <Input id="startDate" type="date" value={formData.startDate} onChange={e => handleInputChange('startDate', e.target.value)} />
               {errors.startDate && <p className="text-destructive text-sm mt-1">{errors.startDate}</p>}
             </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
              <Label htmlFor="paysUtilities" className="text-right">{t('form.pays_utilities')}</Label>
-            <Checkbox id="paysUtilities" checked={formData.paysUtilities} onCheckedChange={checked => setFormData({...formData, paysUtilities: !!checked})} />
+            <Checkbox id="paysUtilities" checked={formData.paysUtilities} onCheckedChange={checked => handleInputChange('paysUtilities', !!checked)} />
         </div>
         <DialogFooter>
             <Button onClick={handleSave}>{t('action.save')}</Button>
@@ -361,5 +380,3 @@ export default function TenantManagement() {
     </Card>
   );
 }
-
-    
