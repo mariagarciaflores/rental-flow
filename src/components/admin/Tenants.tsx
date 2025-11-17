@@ -73,7 +73,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
       fixedMonthlyRent: z.number().min(0, { message: t('validation.rent.negative') }),
       paysUtilities: z.boolean(),
       startDate: z.string().min(1, { message: t('validation.startDate.required') }),
-      phone: z.string().regex(/^\+/, { message: t('validation.phone.invalid') }),
+      phone: z.string().regex(/^\+\d{1,3}\d{4,}$/, { message: t('validation.phone.invalid') }),
     });
 
     if (isEditing) {
