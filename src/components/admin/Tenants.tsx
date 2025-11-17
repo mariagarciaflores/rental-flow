@@ -108,14 +108,16 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
     if (errors[field]) {
       // Only validate if the field exists in the schema
       if (field in TenantSchema.shape) {
-        const fieldSchema = TenantSchema.pick({ [field]: true });
-        const result = fieldSchema.safeParse({ [field]: value });
-        if (result.success) {
-          // If validation for this field passes, remove the error
-          setErrors(prevErrors => {
-            const { [field]: _, ...rest } = prevErrors;
-            return rest;
-          });
+        const fieldSchema = TenantSchema.shape[field];
+        if (fieldSchema) {
+          const result = fieldSchema.safeParse(value);
+          if (result.success) {
+            // If validation for this field passes, remove the error
+            setErrors(prevErrors => {
+              const { [field]: _, ...rest } = prevErrors;
+              return rest;
+            });
+          }
         }
       }
     }
