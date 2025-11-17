@@ -16,5 +16,5 @@ if (
   !firebaseConfig.authDomain ||
   !firebaseConfig.projectId
 ) {
-  console.error("Firebase configuration is missing or incomplete. Please check your environment variables.");
+  throw new Error("Firebase configuration is missing or incomplete. Please check your environment variables.");
 }
