@@ -20,5 +20,3 @@ export const TenantSchemaForEditing = z.object({
     startDate: z.string(),
     phone: z.string(),
 });
-
-    
