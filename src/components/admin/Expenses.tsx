@@ -61,7 +61,7 @@ function ExpenseForm({ properties, onSave }: { properties: Property[], onSave: (
   const [formData, setFormData] = useState<Omit<Expense, 'expenseId'>>(emptyExpense);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | number | ExpenseType) => {
     const newFormData = { ...formData, [field]: value };
     setFormData(newFormData);
 
@@ -84,7 +84,10 @@ function ExpenseForm({ properties, onSave }: { properties: Property[], onSave: (
     if (!result.success) {
       const newErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
-        newErrors[issue.path[0]] = issue.message;
+        const fieldName = issue.path[0];
+        if (fieldName) {
+          newErrors[fieldName as string] = issue.message;
+        }
       }
       setErrors(newErrors);
       return;
