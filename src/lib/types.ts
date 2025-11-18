@@ -31,7 +31,7 @@ export interface Tenant {
   updatedAt: string;
 }
 
-export type InvoiceStatus = 'pending' | 'paid' | 'partial';
+export type InvoiceStatus = 'due' | 'pending' | 'paid' | 'partial';
 
 export interface Invoice {
   id: string;
@@ -51,7 +51,8 @@ export interface Invoice {
   updatedAt: string;
 }
 
-export type ExpenseType = 'FIXED_SERVICE' | 'MAINTENANCE_OTHER';
+export type ExpenseType = 'WATER' | 'ELECTRICITY' | 'GAS' | 'TAXES' | 'PHONE' | 'OTHER_SERVICES';
+
 
 export interface Expense {
   expenseId: string;

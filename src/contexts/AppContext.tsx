@@ -1,8 +1,9 @@
 'use client';
 import { createContext, useState, ReactNode, Dispatch, SetStateAction, useEffect, useCallback } from 'react';
-import type { Invoice, Tenant, Property, User } from '@/lib/types';
+import type { Invoice, Tenant, Property, User, Expense } from '@/lib/types';
 import { useAuth } from './AuthContext';
 import { getTenants, getProperties, getUser, getInvoices } from '@/lib/firebase/firestore';
+import { expenses as initialExpenses } from '@/lib/data';
 
 export type Language = 'en' | 'es';
 export type Role = 'owner' | 'tenant';
@@ -14,13 +15,17 @@ interface AppContextType {
   setRole: (role: Role) => void;
   invoices: Invoice[];
   setInvoices: Dispatch<SetStateAction<Invoice[]>>;
-  tenants: (Tenant & { user?: User })[]; // Tenant contract with user details
+  tenants: (Tenant & { user?: User })[];
   setTenants: Dispatch<SetStateAction<(Tenant & { user?: User })[]>>;
   properties: Property[];
   setProperties: Dispatch<SetStateAction<Property[]>>;
-  currentTenantId: string | null; // This now refers to the TENANCY ID from the 'tenants' collection
+  expenses: Expense[];
+  setExpenses: Dispatch<SetStateAction<Expense[]>>;
+  currentTenantId: string | null;
   currentUser: User | null;
   refreshData: () => Promise<void>;
+  selectedTenancyId: string | null;
+  setSelectedTenancyId: Dispatch<SetStateAction<string | null>>;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -31,9 +36,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [tenants, setTenants] = useState<(Tenant & { user?: User })[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { user: authUser, authKey } = useAuth() || {};
+  const [selectedTenancyId, setSelectedTenancyId] = useState<string | null>(null);
+
 
   const refreshData = useCallback(async () => {
     if (!authUser) return;
@@ -51,11 +59,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const primaryRole = userFromDb.roles.includes('owner') ? 'owner' : userFromDb.roles[0];
             setRole(primaryRole);
 
+            const userTenancies = tenantsFromDb.filter(t => t.userId === authUser.uid);
             if (primaryRole === 'tenant') {
-                const userTenancy = tenantsFromDb.find(t => t.userId === authUser.uid);
-                setCurrentTenantId(userTenancy ? userTenancy.id : null);
+                if (userTenancies.length === 1) {
+                  setSelectedTenancyId(userTenancies[0].id);
+                }
+                // If more than one, user must select. If zero, something is wrong but UI will handle it.
+                setCurrentTenantId(userTenancies.length > 0 ? userTenancies[0].id : null); // legacy tenant id for other parts
             } else {
                 setCurrentTenantId(null);
+                setSelectedTenancyId(null);
             }
         } else {
             // Default to owner if no user doc, for dev purposes
@@ -84,6 +97,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTenants([]);
         setProperties([]);
         setInvoices([]);
+        setSelectedTenancyId(null);
     }
   }, [authUser]);
 
@@ -98,6 +112,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTenants([]);
       setProperties([]);
       setInvoices([]);
+      setExpenses(initialExpenses);
+      setSelectedTenancyId(null);
     }
   }, [authUser, authKey, refreshData]);
   
@@ -119,9 +135,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         invoices, setInvoices, 
         tenants, setTenants, 
         properties, setProperties,
+        expenses, setExpenses,
         currentTenantId,
         currentUser,
-        refreshData
+        refreshData,
+        selectedTenancyId,
+        setSelectedTenancyId
     }}>
       {children}
     </AppContext.Provider>

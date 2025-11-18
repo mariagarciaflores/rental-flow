@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useContext, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,8 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from '@/lib/i18n';
-import type { Expense, ExpenseType } from '@/lib/types';
-import { properties, expenses as initialExpenses } from '@/lib/data';
+import type { Expense, ExpenseType, Property } from '@/lib/types';
 import { PlusCircle } from 'lucide-react';
 import {
     Select,
@@ -32,59 +31,120 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { AppContext } from '@/contexts/AppContext';
+import { z } from 'zod';
+import { useAuth } from '@/contexts/AuthContext';
+
+
+const EXPENSE_TYPES: ExpenseType[] = ['WATER', 'ELECTRICITY', 'GAS', 'TAXES', 'PHONE', 'OTHER_SERVICES'];
 
 const emptyExpense: Omit<Expense, 'expenseId'> = {
   propertyId: '',
-  type: 'MAINTENANCE_OTHER',
+  type: 'OTHER_SERVICES',
   amount: 0,
   description: '',
   date: new Date().toISOString().split('T')[0],
 };
 
-function ExpenseForm({ onSave }: { onSave: (expense: Omit<Expense, 'expenseId'>) => void }) {
+
+function ExpenseForm({ properties, onSave }: { properties: Property[], onSave: (expense: Omit<Expense, 'expenseId'>) => void }) {
   const t = useTranslation();
+  
+  const ExpenseSchema = useMemo(() => z.object({
+    description: z.string().min(1, { message: t('validation.description.required') }),
+    amount: z.number().min(0, { message: t('validation.amount.negative') }),
+    type: z.enum(EXPENSE_TYPES, { errorMap: () => ({ message: t('validation.type.required') }) }),
+    propertyId: z.string().min(1, { message: t('validation.propertyId.required') }),
+    date: z.string().min(1, { message: t('validation.date.required') }),
+  }), [t]);
+
   const [formData, setFormData] = useState<Omit<Expense, 'expenseId'>>(emptyExpense);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData);
+
+    if (errors[field]) {
+      const fieldSchema = ExpenseSchema.shape[field];
+      if (fieldSchema) {
+        const result = fieldSchema.safeParse(value);
+        if (result.success) {
+          setErrors(prevErrors => {
+            const { [field]: _, ...rest } = prevErrors;
+            return rest;
+          });
+        }
+      }
+    }
+  };
 
   const handleSave = () => {
-    onSave(formData);
+    const result = ExpenseSchema.safeParse(formData);
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        newErrors[issue.path[0]] = issue.message;
+      }
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
+    onSave(result.data);
   };
   
   return (
      <div className="grid gap-4 py-4">
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">{t('form.description')}</Label>
-            <Input id="description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="description" value={formData.description} onChange={e => handleInputChange('description', e.target.value)} />
+              {errors.description && <p className="text-destructive text-sm mt-1">{errors.description}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="amount" className="text-right">{t('form.amount')}</Label>
-            <Input id="amount" type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} className="col-span-3" />
+             <div className="col-span-3">
+              <Input id="amount" type="number" value={formData.amount} onChange={e => handleInputChange('amount', Number(e.target.value))} />
+              {errors.amount && <p className="text-destructive text-sm mt-1">{errors.amount}</p>}
+            </div>
         </div>
          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="type" className="text-right">{t('form.type')}</Label>
-            <Select value={formData.type} onValueChange={(value: ExpenseType) => setFormData({...formData, type: value})}>
-                <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="FIXED_SERVICE">Fixed Service</SelectItem>
-                    <SelectItem value="MAINTENANCE_OTHER">Maintenance / Other</SelectItem>
-                </SelectContent>
-            </Select>
+            <div className="col-span-3">
+              <Select value={formData.type} onValueChange={(value: ExpenseType) => handleInputChange('type', value)}>
+                  <SelectTrigger>
+                      <SelectValue placeholder={t('form.select_type')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {EXPENSE_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>{t(`expense_type.${type.toLowerCase()}`)}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              {errors.type && <p className="text-destructive text-sm mt-1">{errors.type}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="property" className="text-right">{t('form.property')}</Label>
-            <Select value={formData.propertyId} onValueChange={value => setFormData({...formData, propertyId: value})}>
-                <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                    {properties.map(p => <SelectItem key={p.propertyId} value={p.propertyId}>{p.name}</SelectItem>)}
-                </SelectContent>
-            </Select>
+             <div className="col-span-3">
+              <Select value={formData.propertyId} onValueChange={value => handleInputChange('propertyId', value)}>
+                  <SelectTrigger>
+                      <SelectValue placeholder={t('form.select_property')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+              {errors.propertyId && <p className="text-destructive text-sm mt-1">{errors.propertyId}</p>}
+            </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="date" className="text-right">{t('form.date')}</Label>
-            <Input id="date" type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="col-span-3" />
+            <div className="col-span-3">
+              <Input id="date" type="date" value={formData.date} onChange={e => handleInputChange('date', e.target.value)} />
+              {errors.date && <p className="text-destructive text-sm mt-1">{errors.date}</p>}
+            </div>
         </div>
         <DialogFooter>
             <Button onClick={handleSave}>{t('action.save')}</Button>
@@ -95,8 +155,16 @@ function ExpenseForm({ onSave }: { onSave: (expense: Omit<Expense, 'expenseId'>)
 
 export default function ExpenseManagement() {
   const t = useTranslation();
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const context = useContext(AppContext);
+  const { user: authUser } = useAuth()!;
   const [open, setOpen] = useState(false);
+
+  if (!context || !authUser) return null;
+  const { properties, setExpenses, expenses } = context;
+
+  const userProperties = useMemo(() => {
+    return properties.filter(p => p.owners.includes(authUser.uid));
+  }, [properties, authUser.uid]);
 
   const handleSave = (formData: Omit<Expense, 'expenseId'>) => {
     setExpenses(prev => [...prev, { expenseId: `exp-${Date.now()}`, ...formData }]);
@@ -104,7 +172,7 @@ export default function ExpenseManagement() {
   };
 
   const getPropertyName = (propertyId: string) => {
-    return properties.find(p => p.propertyId === propertyId)?.name || 'N/A';
+    return properties.find(p => p.id === propertyId)?.name || 'N/A';
   }
 
   const formatCurrency = (amount: number) => {
@@ -130,7 +198,7 @@ export default function ExpenseManagement() {
                 <DialogHeader>
                     <DialogTitle>{t('action.add_expense')}</DialogTitle>
                 </DialogHeader>
-                <ExpenseForm onSave={handleSave} />
+                <ExpenseForm properties={userProperties} onSave={handleSave} />
             </DialogContent>
         </Dialog>
       </CardHeader>
