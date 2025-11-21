@@ -239,3 +239,6 @@ The codebase has intentional type errors that are ignored in builds:
 - Server-side operations MUST use `adminDb` and `adminAuth` from `src/lib/firebase/admin.ts`
 - Client-side uses `db` and `auth` from `src/lib/firebase/client.ts`
 - Never import admin SDK in client components
+
+
+When performing a code review, respond in Spanish.
