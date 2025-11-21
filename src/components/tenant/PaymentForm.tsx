@@ -27,11 +27,10 @@ import { useTranslation } from '@/lib/i18n';
 import { AppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Upload } from 'lucide-react';
-import type { Invoice, InvoiceStatus } from '@/lib/types';
+import type { Invoice } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-
 export function PaymentForm() {
   const t = useTranslation();
   const { toast } = useToast();
@@ -41,13 +40,14 @@ export function PaymentForm() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [fileName, setFileName] = useState('');
 
-  if (!context) return null;
-  const { invoices, refreshData, currentUser } = context;
+  const { invoices, refreshData, currentUser } = context || { invoices: [], refreshData: async () => {}, currentUser: null };
 
   const pendingInvoices = useMemo(() => {
     if (!currentUser) return [];
     return invoices.filter(inv => inv.userId === currentUser.id && inv.status !== 'paid');
   }, [invoices, currentUser]);
+
+  if (!context) return null;
 
   const handleSelectInvoice = (invoiceId: string) => {
     const newSelection = selectedInvoices.includes(invoiceId)
@@ -68,12 +68,6 @@ export function PaymentForm() {
   };
   
   const handleSubmit = async () => {
-    const totalDueSelected = invoices
-      .filter(inv => selectedInvoices.includes(inv.id))
-      .reduce((sum, inv) => sum + inv.totalDue, 0);
-
-    const newStatus: InvoiceStatus = paymentAmount >= totalDueSelected ? 'pending' : 'partial';
-
     try {
         const batch = writeBatch(db);
         selectedInvoices.forEach(invoiceId => {
@@ -81,10 +75,13 @@ export function PaymentForm() {
             const invoice = invoices.find(i => i.id === invoiceId);
             if (!invoice) return;
 
+            const remainingBalance = invoice.totalDue - (invoice.submittedPaymentAmount || 0);
+            const paymentForThisInvoice = Math.min(remainingBalance, paymentAmount / selectedInvoices.length);
+
             batch.update(invoiceRef, {
-                status: newStatus,
+                status: 'pending',
                 paymentProofUrl: PlaceHolderImages[0].imageUrl, // Simulated upload
-                submittedPaymentAmount: (invoice.submittedPaymentAmount || 0) + (paymentAmount / selectedInvoices.length), // Distribute payment
+                submittedPaymentAmount: (invoice.submittedPaymentAmount || 0) + paymentForThisInvoice,
                 submissionDate: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             });
@@ -140,13 +137,23 @@ export function PaymentForm() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {pendingInvoices.map(inv => (
+                            {pendingInvoices.map(inv => {
+                                const remainingBalance = inv.totalDue - (inv.submittedPaymentAmount || 0);
+                                const isPayable = remainingBalance > 0;
+                                return (
                                 <TableRow key={inv.id}>
-                                    <TableCell><Checkbox checked={selectedInvoices.includes(inv.id)} onCheckedChange={() => handleSelectInvoice(inv.id)} /></TableCell>
+                                    <TableCell>
+                                        <Checkbox 
+                                            checked={selectedInvoices.includes(inv.id)} 
+                                            onCheckedChange={() => handleSelectInvoice(inv.id)}
+                                            disabled={!isPayable}
+                                        />
+                                    </TableCell>
                                     <TableCell>{inv.month}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(inv.totalDue - (inv.submittedPaymentAmount || 0))}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(remainingBalance)}</TableCell>
                                 </TableRow>
-                            ))}
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </CardContent>

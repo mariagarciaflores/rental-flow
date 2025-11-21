@@ -10,20 +10,21 @@ import PaymentVerificationDialog from './PaymentVerificationDialog';
 export default function AdminDashboard() {
   const t = useTranslation();
   const context = useContext(AppContext);
-  if (!context) return null;
+  
+  const { invoices, tenants } = context || { invoices: [], tenants: [] };
 
-  const { invoices, tenants } = context;
-
-  const unverifiedPayments = invoices.filter(
-    (invoice) => invoice.status === 'pending' && invoice.paymentProofUrl
-  );
+  const unverifiedPayments = useMemo(() => {
+    return invoices.filter(
+      (invoice) => invoice.status === 'pending' && invoice.paymentProofUrl
+    );
+  }, [invoices]);
 
   const { totalIncome, totalOutstanding } = useMemo(() => {
     return invoices.reduce(
       (acc, invoice) => {
         if (invoice.status === 'paid') {
           acc.totalIncome += invoice.totalDue;
-        } else {
+        } else if (invoice.status === 'due' || invoice.status === 'partial') {
           acc.totalOutstanding += invoice.totalDue - (invoice.submittedPaymentAmount || 0);
         }
         return acc;
@@ -34,7 +35,9 @@ export default function AdminDashboard() {
 
   const totalExpenses = useMemo(() => {
     return expenseData.reduce((acc, expense) => acc + expense.amount, 0);
-  }, [expenseData]);
+  }, []);
+
+  if (!context) return null;
 
   const totalSavings = totalIncome - totalExpenses;
 

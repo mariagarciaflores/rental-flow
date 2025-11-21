@@ -30,8 +30,7 @@ export default function TenantDashboard() {
   const context = useContext(AppContext);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
-  if (!context) return null;
-  const { invoices, currentUser } = context;
+  const { invoices, currentUser, currentTenantId } = context || { invoices: [], currentUser: null, currentTenantId: null };
 
   const tenantInvoices = useMemo(() => {
     if (!currentUser) return [];
@@ -55,14 +54,17 @@ export default function TenantDashboard() {
     return Array.from(years).sort().reverse();
   }, [tenantInvoices]);
 
+  if (!context) return null;
+
   const getStatusVariant = (status: InvoiceStatus): 'default' | 'secondary' | 'destructive' => {
     switch (status) {
       case 'paid':
-        return 'default';
+        return 'default'; // Or a green color
       case 'pending':
-        return 'destructive';
+        return 'secondary'; // Yellow/Orange
+      case 'due':
       case 'partial':
-        return 'secondary';
+        return 'destructive'; // Red
       default:
         return 'default';
     }
@@ -72,7 +74,7 @@ export default function TenantDashboard() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
-  if (!currentUser || !context.currentTenantId) {
+  if (!currentUser || !currentTenantId) {
     return (
         <Alert variant="destructive">
             <Info className="h-4 w-4" />

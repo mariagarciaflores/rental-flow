@@ -130,16 +130,18 @@ export default function PropertyList() {
   const { user: authUser } = useAuth()!;
   const { toast } = useToast();
 
-  if (!context || !authUser) return null;
-  const { properties, refreshData } = context;
+  const { properties, refreshData } = context || { properties: [], refreshData: async () => {} };
 
   const userProperties = useMemo(() => {
+    if (!authUser) return [];
     return properties.filter(p => p.owners.includes(authUser.uid));
-  }, [properties, authUser.uid]);
+  }, [properties, authUser]);
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
+
+  if (!context || !authUser) return null;
 
   const handleDelete = async (propertyId: string) => {
     try {
