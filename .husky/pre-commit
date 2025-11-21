@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+npx next lint
+npm run test

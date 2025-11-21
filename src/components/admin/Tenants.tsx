@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -59,14 +60,13 @@ const emptyTenantData = {
   propertyId: '',
   fixedMonthlyRent: 0,
   paysUtilities: false,
-  startDate: new Date().toISOString().split('T')[0], // Default to today
+  startDate: '', // Default to empty
 };
 
 
 function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant & { user?: User }, properties: Property[], onSave: (tenantData: any) => void, isEditing: boolean }) {
   const t = useTranslation();
   
-  // Define schema inside the component to use the translation hook
   const TenantSchema = useMemo(() => {
     const baseSchema = z.object({
       propertyId: z.string().min(1, { message: t('validation.propertyId.required') }),
@@ -77,7 +77,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
     });
 
     if (isEditing) {
-      return baseSchema; // No need to validate name and email when editing
+      return baseSchema; 
     }
 
     return baseSchema.extend({
@@ -104,22 +104,17 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
     const newFormData = { ...formData, [field]: value };
     setFormData(newFormData);
 
-    // If there was an error on this field, try to re-validate it
     if (errors[field]) {
-      // Only validate if the field exists in the schema
-      if (field in TenantSchema.shape) {
-        const fieldSchema = TenantSchema.shape[field];
+        const fieldSchema = (TenantSchema.shape as any)[field];
         if (fieldSchema) {
-          const result = fieldSchema.safeParse(value);
-          if (result.success) {
-            // If validation for this field passes, remove the error
+            const result = fieldSchema.safeParse(value);
+            if (result.success) {
             setErrors(prevErrors => {
-              const { [field]: _, ...rest } = prevErrors;
-              return rest;
+                const { [field]: _, ...rest } = prevErrors;
+                return rest;
             });
-          }
+            }
         }
-      }
     }
   };
 
@@ -130,7 +125,7 @@ function TenantForm({ tenant, properties, onSave, isEditing }: { tenant?: Tenant
     if (!result.success) {
       const newErrors: Record<string, string> = {};
       for (const issue of result.error.issues) {
-        newErrors[issue.path[0]] = issue.message;
+        newErrors[issue.path[0] as string] = issue.message;
       }
       setErrors(newErrors);
       return;
@@ -256,6 +251,9 @@ function TenantDialog({ tenant, properties, children }: { tenant?: Tenant & { us
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{tenant ? t('action.edit_tenant') : t('action.add_tenant')}</DialogTitle>
+                    <DialogDescription>
+                        {tenant ? "Edit the details of the existing tenant." : "Add a new tenant to one of your properties. If the user is new, they will receive an email to set up their account."}
+                    </DialogDescription>
                 </DialogHeader>
                 <TenantForm tenant={tenant} properties={properties} onSave={handleSave} isEditing={!!tenant} />
             </DialogContent>
@@ -271,16 +269,18 @@ export default function TenantManagement() {
   const [isPending, startTransition] = useTransition();
   const [sendingFor, setSendingFor] = useState<string | null>(null);
 
-  useEffect(() => {
-    context?.refreshData();
-  }, []);
+  const { tenants, properties, refreshData } = context || { tenants: [], properties: [], refreshData: async () => {} };
 
-  if (!context || !authUser) return null;
-  const { tenants, properties, refreshData } = context;
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const userProperties = useMemo(() => {
+    if (!authUser) return [];
     return properties.filter(p => p.owners.includes(authUser.uid));
-  }, [properties, authUser.uid]);
+  }, [properties, authUser]);
+
+  if (!context || !authUser) return null;
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.id === propertyId)?.name || 'N/A';

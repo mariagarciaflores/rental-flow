@@ -66,7 +66,7 @@ function ExpenseForm({ properties, onSave }: { properties: Property[], onSave: (
     setFormData(newFormData);
 
     if (errors[field]) {
-      const fieldSchema = ExpenseSchema.shape[field];
+      const fieldSchema = ExpenseSchema.shape[field as keyof typeof ExpenseSchema.shape];
       if (fieldSchema) {
         const result = fieldSchema.safeParse(value);
         if (result.success) {
@@ -162,12 +162,14 @@ export default function ExpenseManagement() {
   const { user: authUser } = useAuth()!;
   const [open, setOpen] = useState(false);
 
-  if (!context || !authUser) return null;
-  const { properties, setExpenses, expenses } = context;
+  const { properties, setExpenses, expenses } = context || { properties: [], setExpenses: () => {}, expenses: [] };
 
   const userProperties = useMemo(() => {
+    if (!authUser) return [];
     return properties.filter(p => p.owners.includes(authUser.uid));
-  }, [properties, authUser.uid]);
+  }, [properties, authUser]);
+
+  if (!context || !authUser) return null;
 
   const handleSave = (formData: Omit<Expense, 'expenseId'>) => {
     setExpenses(prev => [...prev, { expenseId: `exp-${Date.now()}`, ...formData }]);
