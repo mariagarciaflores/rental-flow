@@ -29,10 +29,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Upload } from 'lucide-react';
 import type { Invoice } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { writeBatch } from 'firebase/firestore';
+import { writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { doc } from 'firebase/firestore';
-
 export function PaymentForm() {
   const t = useTranslation();
   const { toast } = useToast();

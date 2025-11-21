@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import TenantManagement from '../Tenants';
-import { AppContext, AppProvider } from '@/contexts/AppContext';
+import { AppProvider } from '@/contexts/AppContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { translations } from '@/lib/i18n';
 import type { User } from '@/lib/types';
